@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "./services/api";
 import "./App.css";
 import Navbar from "./components/Navbar";
+import ReportStatistics from "./components/ReportStatistics";
 
 const STATUS = {
 
@@ -219,33 +220,7 @@ function App() {
 
         </section>
 
-        <section className="container stats" aria-label="Report statistics">
-
-          <div className="stat">
-
-            <div className="stat-label">Total reports</div>
-
-            <div className="stat-number">{statistics.total}</div>
-
-          </div>
-
-          <div className="stat">
-
-            <div className="stat-label">Awaiting resolution</div>
-
-            <div className="stat-number">{statistics.unresolved}</div>
-
-          </div>
-
-          <div className="stat">
-
-            <div className="stat-label">Resolved reports</div>
-
-            <div className="stat-number">{statistics.resolved}</div>
-
-          </div>
-
-        </section>
+        <ReportStatistics statistics={statistics} />
 
         <section className="container reports-section" id="reports">
 
