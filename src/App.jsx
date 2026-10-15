@@ -4,6 +4,7 @@ import { apiRequest } from "./services/api";
 import "./App.css";
 import Navbar from "./components/Navbar";
 import ReportStatistics from "./components/ReportStatistics";
+import ReportFilters from "./components/ReportFilters";
 
 const STATUS = {
 
@@ -224,67 +225,13 @@ function App() {
 
         <section className="container reports-section" id="reports">
 
-          <div className="section-heading">
-
-            <div>
-
-              <h2>Community reports</h2>
-
-              <p className="muted">
-
-                Follow reported issues and their current status.
-
-              </p>
-
-            </div>
-
-            <input
-
-              className="search"
-
-              type="search"
-
-              placeholder="Search reports..."
-
-              aria-label="Search reports"
-
-              value={search}
-
-              onChange={(event) => setSearch(event.target.value)}
-
-            />
-
-          </div>
-
-          <div className="filters" aria-label="Filter reports by status">
-
-            {FILTERS.map((filter) => (
-
-              <button
-
-                key={filter}
-
-                type="button"
-
-                className={`filter-button ${
-
-                  activeFilter === filter ? "active" : ""
-
-                }`}
-
-                aria-pressed={activeFilter === filter}
-
-                onClick={() => setActiveFilter(filter)}
-
-              >
-
-                {filter}
-
-              </button>
-
-            ))}
-
-          </div>
+          <ReportFilters
+            search={search}
+            onSearchChange={setSearch}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            filters={FILTERS}
+          />
 
           {loading ? (
 
