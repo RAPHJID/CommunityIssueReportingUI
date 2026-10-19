@@ -7,6 +7,7 @@ import ReportStatistics from "./components/ReportStatistics";
 import ReportFilters from "./components/ReportFilters";
 import ReportList from "./components/ReportList";
 import LoginForm from "./components/LoginForm";
+import ReportForm from "./components/ReportForm";
 
 const STATUS = {
   0: "Submitted",
@@ -72,6 +73,7 @@ function App() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("All Reports");
+  const [showReportForm, setShowReportForm] = useState(false);
 
   // Authentication state belongs at the top level of App.
   const [currentUser, setCurrentUser] = useState(getSavedUser);
@@ -212,6 +214,43 @@ function App() {
             />
           )}
         </section>
+
+        
+{currentUser && (
+  <section className="container report-launch-area">
+    {!showReportForm ? (
+      <button
+        type="button"
+        className="report-launch-button"
+        onClick={() => setShowReportForm(true)}
+      >
+        <span className="report-launch-copy">
+          <span className="report-launch-eyebrow">
+            YOUR COMMUNITY NEEDS YOU
+          </span>
+
+          <span className="report-launch-title">
+            Something needs attention?
+          </span>
+
+          <span className="report-launch-description">
+            Submit a report and help bring local issues into focus.
+          </span>
+        </span>
+
+        <span className="report-launch-arrow" aria-hidden="true">
+          →
+        </span>
+      </button>
+    ) : (
+      <ReportForm
+        onCancel={() => setShowReportForm(false)}
+        onReportCreated={loadReports}
+      />
+    )}
+  </section>
+)}
+
 
         <ReportStatistics statistics={statistics} />
 
