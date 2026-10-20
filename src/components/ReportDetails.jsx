@@ -1,3 +1,4 @@
+import ReportTimeline from "./ReportTimeline";
 
 function ReportDetails({
   report,
@@ -9,6 +10,10 @@ function ReportDetails({
   formatDate,
   categoryName,
   locationName,
+  history,
+historyLoading,
+historyError,
+onRetryHistory,
 }) {
   const status = report
     ? getStatusLabel(report.currentStatus)
@@ -107,6 +112,14 @@ function ReportDetails({
               {report.description || "No description provided."}
             </p>
           </div>
+          <ReportTimeline
+  report={report}
+  history={history}
+  loading={historyLoading}
+  error={historyError}
+  onRetry={onRetryHistory}
+  getStatusLabel={getStatusLabel}
+/>
 
           {report.isDuplicate && (
             <div className="report-details-duplicate">
