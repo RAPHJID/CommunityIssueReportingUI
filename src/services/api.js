@@ -1,3 +1,4 @@
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export async function apiRequest(endpoint, options = {}) {
@@ -24,9 +25,46 @@ export async function apiRequest(endpoint, options = {}) {
     );
   }
 
-  if (response.status === 204) {
-    return null;
+  if (response.status === 204) return null;
+
+  return response.json();
+}
+
+export async function uploadReportPhoto(reportId, file) {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    throw new Error("Please sign in before uploading photos.");
+  }
+
+  const formData = new FormData();
+  formData.append("File", file);
+  formData.append("Purpose", "0");
+
+  const response = await fetch(
+    `${API_BASE_URL}/Media?reportId=${encodeURIComponent(reportId)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      errorText || `Photo upload failed (${response.status}).`
+    );
   }
 
   return response.json();
+}
+
+export function getMediaUrl(filePath) {
+  if (!filePath) return "";
+
+  const apiOrigin = new URL(API_BASE_URL).origin;
+  return new URL(filePath, apiOrigin).href;
 }

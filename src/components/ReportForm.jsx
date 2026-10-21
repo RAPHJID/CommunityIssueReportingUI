@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from "react";
-import { apiRequest } from "../services/api";
+import { apiRequest, uploadReportPhoto } from "../services/api";
+import PhotoUploader from "./PhotoUploader";
 
 function getOptionId(item) {
   return item?.id ?? item?.categoryId ?? item?.locationId ?? "";
@@ -23,6 +24,8 @@ function ReportForm({ onReportCreated, onCancel }) {
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [locationId, setLocationId] = useState("");
+  const [photos, setPhotos] = useState([]);
+  const [savedReportId, setSavedReportId] = useState(null);
 
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -77,56 +80,91 @@ function ReportForm({ onReportCreated, onCancel }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (isSubmitting) return;
+
     setSubmitError("");
     setSuccessMessage("");
 
     const cleanTitle = title.trim();
     const cleanDescription = description.trim();
 
-    if (cleanTitle.length < 5 || cleanTitle.length > 255) {
-      setSubmitError("The title must be between 5 and 255 characters.");
-      return;
-    }
+    if (!savedReportId) {
+      if (cleanTitle.length < 5 || cleanTitle.length > 255) {
+        setSubmitError("The title must be between 5 and 255 characters.");
+        return;
+      }
 
-    if (cleanDescription.length < 10 || cleanDescription.length > 2000) {
-      setSubmitError(
-        "The description must be between 10 and 2,000 characters."
-      );
-      return;
-    }
+      if (cleanDescription.length < 10 || cleanDescription.length > 2000) {
+        setSubmitError("The description must be between 10 and 2,000 characters.");
+        return;
+      }
 
-    if (!categoryId || !locationId) {
-      setSubmitError("Please select both a category and a location.");
-      return;
+      if (!categoryId || !locationId) {
+        setSubmitError("Please select both a category and a location.");
+        return;
+      }
     }
 
     setIsSubmitting(true);
+    let reportId = savedReportId;
 
     try {
-      await apiRequest("/Report", {
-        method: "POST",
-        body: JSON.stringify({
-          title: cleanTitle,
-          description: cleanDescription,
-          categoryId,
-          locationId,
-        }),
-      });
+      if (!reportId) {
+        const createdReport = await apiRequest("/Report", {
+          method: "POST",
+          body: JSON.stringify({
+            title: cleanTitle,
+            description: cleanDescription,
+            categoryId,
+            locationId,
+          }),
+        });
 
-      setSuccessMessage("Your report has been submitted successfully.");
-      setTitle("");
-      setDescription("");
-      setCategoryId("");
-      setLocationId("");
+        if (!createdReport?.id) {
+          throw new Error(
+            "The server did not return a report ID. Check your reports before trying again."
+          );
+        }
+
+        reportId = createdReport.id;
+        setSavedReportId(reportId);
+      }
+
+      const failedPhotos = [];
+      for (const photo of photos) {
+        try {
+          await uploadReportPhoto(reportId, photo);
+        } catch (uploadError) {
+          console.error("Photo upload failed:", uploadError);
+          failedPhotos.push(photo);
+        }
+      }
+
+      if (failedPhotos.length) {
+        setPhotos(failedPhotos);
+        setSubmitError(
+          `Report saved, but ${failedPhotos.length} photo(s) could not be confirmed as uploaded. You can retry the remaining photos, but check the report first to avoid duplicate images.`
+        );
+        setSuccessMessage("Your community report was created successfully.");
+      } else {
+        setSavedReportId(null);
+        setPhotos([]);
+        setTitle("");
+        setDescription("");
+        setCategoryId("");
+        setLocationId("");
+        setSuccessMessage("Your report and photos were submitted successfully.");
+      }
 
       if (onReportCreated) {
-        await onReportCreated();
+        try {
+          await onReportCreated();
+        } catch (refreshError) {
+          console.error("Unable to refresh reports:", refreshError);
+        }
       }
     } catch (err) {
-      setSubmitError(
-        err.message ||
-          "We couldn't submit your report. Please try again."
-      );
+      setSubmitError(err.message || "Unable to submit your report.");
     } finally {
       setIsSubmitting(false);
     }
@@ -228,7 +266,7 @@ function ReportForm({ onReportCreated, onCancel }) {
               minLength={5}
               maxLength={255}
               required
-              disabled={isSubmitting}
+              disabled={isSubmitting || Boolean(savedReportId)}
             />
             <p className="report-form-hint">
               Summarise the issue in one clear sentence.
@@ -250,7 +288,7 @@ function ReportForm({ onReportCreated, onCancel }) {
               maxLength={2000}
               rows={4}
               required
-              disabled={isSubmitting}
+              disabled={isSubmitting || Boolean(savedReportId)}
             />
             <p className="report-form-hint">
               Include enough detail to help others understand the issue.
@@ -266,7 +304,7 @@ function ReportForm({ onReportCreated, onCancel }) {
                 value={categoryId}
                 onChange={(event) => setCategoryId(event.target.value)}
                 required
-                disabled={loadingOptions || isSubmitting}
+                disabled={loadingOptions || isSubmitting || Boolean(savedReportId)}
               >
                 <option value="">
                   {loadingOptions ? "Loading categories..." : "Choose a category"}
@@ -295,7 +333,7 @@ function ReportForm({ onReportCreated, onCancel }) {
                 value={locationId}
                 onChange={(event) => setLocationId(event.target.value)}
                 required
-                disabled={loadingOptions || isSubmitting}
+                disabled={loadingOptions || isSubmitting || Boolean(savedReportId)}
               >
                 <option value="">
                   {loadingOptions ? "Loading locations..." : "Choose a location"}
@@ -319,6 +357,12 @@ function ReportForm({ onReportCreated, onCancel }) {
             </p>
           </div>
 
+          <PhotoUploader
+            photos={photos}
+            onChange={setPhotos}
+            disabled={isSubmitting}
+          />
+
           {submitError && (
             <div className="report-form-error" role="alert">
               <span aria-hidden="true">!</span>
@@ -332,7 +376,7 @@ function ReportForm({ onReportCreated, onCancel }) {
             disabled={isSubmitting || loadingOptions || Boolean(optionsError)}
           >
             <span>
-              {isSubmitting ? "Submitting report..." : "Submit community report"}
+              {isSubmitting ? "Saving report and photos..." : savedReportId ? "Retry remaining photos" : "Submit community report"}
             </span>
             {!isSubmitting && (
               <span className="report-form-submit-arrow" aria-hidden="true">
