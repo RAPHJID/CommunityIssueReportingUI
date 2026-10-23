@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { apiRequest, uploadReportPhoto } from "../services/api";
 import PhotoUploader from "./PhotoUploader";
+import LocationPicker from "./LocationPicker";
 
 function getOptionId(item) {
   return item?.id ?? item?.categoryId ?? item?.locationId ?? "";
@@ -24,6 +25,12 @@ function ReportForm({ onReportCreated, onCancel }) {
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [locationId, setLocationId] = useState("");
+  const [locationMode, setLocationMode] = useState("existing");
+  const [mapPoint, setMapPoint] = useState(null);
+  const [wardId, setWardId] = useState("");
+  const [wards, setWards] = useState([]);
+  const [locationDescription, setLocationDescription] = useState("");
+  const [createdPinId, setCreatedPinId] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [savedReportId, setSavedReportId] = useState(null);
 
@@ -58,6 +65,10 @@ function ReportForm({ onReportCreated, onCancel }) {
 
         setCategories(categoryData);
         setLocations(locationData);
+        try {
+          const wardData = await apiRequest("/Ward");
+          if (!cancelled && Array.isArray(wardData)) setWards(wardData);
+        } catch (wardError) { console.error("Unable to load wards:", wardError); }
       } catch (err) {
         if (!cancelled) {
           setOptionsError(
@@ -99,8 +110,8 @@ function ReportForm({ onReportCreated, onCancel }) {
         return;
       }
 
-      if (!categoryId || !locationId) {
-        setSubmitError("Please select both a category and a location.");
+      if (!categoryId || (locationMode === "existing" ? !locationId : (!mapPoint || !wardId))) {
+        setSubmitError(locationMode === "existing" ? "Please select both a category and a location." : "Please select a category, ward, and a point on the map.");
         return;
       }
     }
@@ -110,13 +121,31 @@ function ReportForm({ onReportCreated, onCancel }) {
 
     try {
       if (!reportId) {
+        let finalLocationId = locationId;
+        if (locationMode === "map") {
+          finalLocationId = createdPinId;
+          if (!finalLocationId) {
+            const pin = await apiRequest("/Location/report-pin", {
+              method: "POST",
+              body: JSON.stringify({
+                latitude: mapPoint.latitude,
+                longitude: mapPoint.longitude,
+                accuracyMeters: mapPoint.accuracyMeters,
+                wardId, areaId: null, description: locationDescription.trim() || null
+              })
+            });
+            if (!pin?.id) throw new Error("Location was not saved. Please retry.");
+            finalLocationId = pin.id;
+            setCreatedPinId(pin.id);
+          }
+        }
         const createdReport = await apiRequest("/Report", {
           method: "POST",
           body: JSON.stringify({
             title: cleanTitle,
             description: cleanDescription,
             categoryId,
-            locationId,
+            locationId: finalLocationId,
           }),
         });
 
@@ -153,6 +182,11 @@ function ReportForm({ onReportCreated, onCancel }) {
         setDescription("");
         setCategoryId("");
         setLocationId("");
+        setCreatedPinId(null);
+        setMapPoint(null);
+        setWardId("");
+        setLocationDescription("");
+        setLocationMode("existing");
         setSuccessMessage("Your report and photos were submitted successfully.");
       }
 
@@ -325,36 +359,36 @@ function ReportForm({ onReportCreated, onCancel }) {
           </div>
 
           <div className="report-form-field">
-            <label htmlFor="report-location">Issue location</label>
-
-            <div className="report-form-select-wrap">
-              <select
-                id="report-location"
-                value={locationId}
-                onChange={(event) => setLocationId(event.target.value)}
-                required
-                disabled={loadingOptions || isSubmitting || Boolean(savedReportId)}
-              >
-                <option value="">
-                  {loadingOptions ? "Loading locations..." : "Choose a location"}
-                </option>
-
-                {locations.map((location) => {
-                  const id = getOptionId(location);
-                  const name = getOptionName(location);
-
-                  return id && name ? (
-                    <option key={id} value={id}>
-                      {name}
-                    </option>
-                  ) : null;
-                })}
-              </select>
-            </div>
-
-            <p className="report-form-hint">
-              Choose the area where the issue is located.
-            </p>
+            <label htmlFor="location-mode">How would you like to choose the issue location?</label>
+            <select id="location-mode" value={locationMode} onChange={(e) => { setLocationMode(e.target.value); setCreatedPinId(null); }} disabled={isSubmitting || Boolean(savedReportId)}>
+              <option value="existing">Choose an existing location</option>
+              <option value="map">Pin the location on a map</option>
+            </select>
+            {locationMode === "existing" ? (
+              <div className="report-form-select-wrap">
+                <select id="report-location" value={locationId} onChange={(e) => setLocationId(e.target.value)} required disabled={loadingOptions || isSubmitting || Boolean(savedReportId)}>
+                  <option value="">{loadingOptions ? "Loading locations..." : "Choose a location"}</option>
+                  {locations.map((location) => {
+                    const id = getOptionId(location);
+                    const name = getOptionName(location);
+                    return id && name ? <option key={id} value={id}>{name}</option> : null;
+                  })}
+                </select>
+              </div>
+            ) : (
+              <>
+                <label htmlFor="report-ward" style={{display:"block", marginTop:12}}>Ward</label>
+                <select id="report-ward" value={wardId} onChange={(e) => { setWardId(e.target.value); setCreatedPinId(null); }} required disabled={isSubmitting || Boolean(savedReportId)}>
+                  <option value="">Select the ward</option>
+                  {wards.map((ward) => <option key={ward.id} value={ward.id}>{ward.name ?? ward.wardName ?? ward.description ?? ward.id}</option>)}
+                </select>
+                {wards.length === 0 && <p className="report-form-hint">No wards loaded. Confirm your API exposes GET /api/Ward.</p>}
+                <LocationPicker point={mapPoint} onChange={(point) => { setMapPoint(point); setCreatedPinId(null); }} disabled={isSubmitting || Boolean(savedReportId)} />
+                <label htmlFor="pin-description" style={{display:"block", marginTop:12}}>Nearby landmark (optional)</label>
+                <input id="pin-description" value={locationDescription} onChange={(e) => { setLocationDescription(e.target.value); setCreatedPinId(null); }} maxLength={500} placeholder="e.g. Near the market entrance" disabled={isSubmitting || Boolean(savedReportId)} />
+                <p className="report-form-hint">Select the correct ward manually. The map pin does not verify ward boundaries.</p>
+              </>
+            )}
           </div>
 
           <PhotoUploader
