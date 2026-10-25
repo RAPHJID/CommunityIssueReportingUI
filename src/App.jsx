@@ -11,6 +11,8 @@ import ReportList from "./components/ReportList";
 import LoginForm from "./components/LoginForm";
 import ReportForm from "./components/ReportForm";
 import ReportDetails from "./components/ReportDetails";
+import AdminDashboard from "./components/AdminDashboard";
+import { isAdminUser } from "./utils/authRoles";
 
 const STATUS = {
   0: "Submitted",
@@ -99,6 +101,8 @@ function App() {
   const [currentUser, setCurrentUser] = useState(getSavedUser);
   const [showLogin, setShowLogin] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+  const isAdmin = isAdminUser(currentUser);
 
   // ==========================================
   // INDIVIDUAL REPORT DETAILS STATE
@@ -341,6 +345,7 @@ function App() {
     setCurrentUser(null);
     setShowLogin(false);
     setShowReportForm(false);
+    setShowAdminDashboard(false);
   }
 
   // ==========================================
@@ -348,6 +353,7 @@ function App() {
   // ==========================================
 
   function handleSelectReport(reportId) {
+    setShowAdminDashboard(false);
     setSelectedReportId(reportId);
     setSelectedReport(null);
     setDetailsError("");
@@ -451,6 +457,31 @@ function App() {
             />
           )}
         </section>
+
+        {isAdmin && (
+          <section className="container" aria-label="Administration access">
+            <button type="button" className="secondary-button" onClick={() => {
+              setShowAdminDashboard(current => !current);
+              setSelectedReportId(null);
+            }}>
+              {showAdminDashboard ? "Return to community reports" : "Open admin dashboard"}
+            </button>
+          </section>
+        )}
+
+        {isAdmin && showAdminDashboard && (
+          <div className="container">
+            <AdminDashboard
+              reports={reports}
+              loading={loading}
+              error={error}
+              onRetry={loadReports}
+              onOpenReport={handleSelectReport}
+              getStatusLabel={getStatusLabel}
+              formatDate={formatDate}
+            />
+          </div>
+        )}
 
         {/* REPORT SUBMISSION SECTION */}
 
