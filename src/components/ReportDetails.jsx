@@ -1,3 +1,4 @@
+import ReportLocationMap from "./ReportLocationMap";
 import ReportTimeline from "./ReportTimeline";
 import ReportGallery from "./ReportGallery";
 
@@ -62,6 +63,8 @@ function ReportDetails({
             <h3>Issue description</h3>
             <p className="report-details-description">{report.description || "No description provided."}</p>
           </div>
+
+          <ReportLocationMap locationId={report.locationId} locationName={locationName} />
 
           <ReportGallery reportId={report.id} />
 

@@ -1,0 +1,6 @@
+.report-location-section { margin: 28px 0; }
+.report-location-section h3 { margin: 8px 0; }
+.report-location-name { margin: 4px 0 14px; }
+.report-location-map { height: 300px; width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid #dce6dc; }
+.report-location-coordinates { font-size: 0.85rem; color: #5b685f; margin-top: 9px; }
+@media (max-width: 600px) { .report-location-map { height: 250px; } }
