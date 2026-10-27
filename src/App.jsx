@@ -349,6 +349,35 @@ function App() {
   }
 
   // ==========================================
+// ADMIN: UPDATE REPORT STATUS
+// ==========================================
+
+async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
+  if (!isAdmin) {
+    throw new Error("Only administrators can update report statuses.");
+  }
+
+  await apiRequest(`/Report/${reportId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      newStatus: Number(newStatus),
+      reason: reason.trim(),
+      notes: notes.trim() || null,
+    }),
+  });
+
+  // Refresh the community reports and admin statistics.
+  await loadReports();
+
+  // Refresh details and timeline if this report is currently open.
+  if (selectedReportId === reportId) {
+    await Promise.all([
+      loadReportDetails(reportId),
+      loadReportHistory(reportId),
+    ]);
+  }
+}
+  // ==========================================
   // REPORT NAVIGATION HANDLERS
   // ==========================================
 
@@ -472,14 +501,15 @@ function App() {
         {isAdmin && showAdminDashboard && (
           <div className="container">
             <AdminDashboard
-              reports={reports}
-              loading={loading}
-              error={error}
-              onRetry={loadReports}
-              onOpenReport={handleSelectReport}
-              getStatusLabel={getStatusLabel}
-              formatDate={formatDate}
-            />
+  reports={reports}
+  loading={loading}
+  error={error}
+  onRetry={loadReports}
+  onOpenReport={handleSelectReport}
+  onUpdateStatus={handleUpdateReportStatus}
+  getStatusLabel={getStatusLabel}
+  formatDate={formatDate}
+/>
           </div>
         )}
 
