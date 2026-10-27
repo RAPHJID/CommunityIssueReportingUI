@@ -13,6 +13,7 @@ import ReportForm from "./components/ReportForm";
 import ReportDetails from "./components/ReportDetails";
 import AdminDashboard from "./components/AdminDashboard";
 import { isAdminUser } from "./utils/authRoles";
+import CommunityIssuesMap from "./components/CommunityIssuesMap";
 
 const STATUS = {
   0: "Submitted",
@@ -553,6 +554,22 @@ async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
             )}
           </section>
         )}
+
+        {/* INTERACTIVE COMMUNITY ISSUES MAP */}
+
+{!selectedReportId && (
+  <section
+    className="container"
+    id="community-map"
+  >
+    <CommunityIssuesMap
+      reports={reports}
+      getStatusLabel={getStatusLabel}
+      formatDate={formatDate}
+      onOpenReport={handleSelectReport}
+    />
+  </section>
+)}
 
         {/* COMMUNITY STATISTICS */}
 
