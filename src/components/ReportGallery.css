@@ -37,3 +37,33 @@
 .evidence-lightbox-nav { flex-shrink: 0; width: 43px; height: 43px; border: 1px solid #496357; border-radius: 50%; background: #213c30; color: #fff; font-size: 30px; cursor: pointer; }
 .evidence-lightbox-footer { text-align: center; padding-top: 16px; }
 @media (max-width: 650px) { .evidence-gallery { padding: 18px; border-radius: 16px; } .evidence-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; } .evidence-gallery-tile { aspect-ratio: 1; } .evidence-gallery-header h3 { font-size: 20px; } .evidence-gallery-tag { font-size: 8px; padding: 6px; } .evidence-lightbox-nav { width: 32px; height: 40px; } .evidence-lightbox-stage img { max-width: calc(100% - 84px); } }
+
+/* BEFORE AND AFTER PHOTO SECTIONS */
+
+.evidence-before-after {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.evidence-photo-section {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #e2e8e4;
+  border-radius: 12px;
+}
+
+.evidence-photo-section h4 {
+  margin: 0 0 0.5rem;
+}
+
+.evidence-photo-section .evidence-gallery-grid {
+  margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+  .evidence-before-after {
+    grid-template-columns: 1fr;
+  }
+}

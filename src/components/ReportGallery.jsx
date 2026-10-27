@@ -67,8 +67,88 @@ function ReportGallery({ reportId }) {
   }, [activeIndex, closeLightbox, showNext, showPrevious, photos.length]);
 
   const selectedPhoto = activeIndex === null ? null : photos[activeIndex];
-  const reportAttachments = photos.filter((item) => item.purpose === 0).length;
-  const resolutionEvidence = photos.filter((item) => item.purpose === 1).length;
+  const originalPhotos = photos.filter(
+  (item) => item.purpose === 0
+);
+
+const resolutionPhotos = photos.filter(
+  (item) => item.purpose === 1
+);
+
+const reportAttachments = originalPhotos.length;
+const resolutionEvidence = resolutionPhotos.length;
+
+function renderPhotoSection(title, description, sectionPhotos) {
+  if (sectionPhotos.length === 0) {
+    return (
+      <div className="evidence-gallery-empty">
+        <p>
+          {title === "Resolution Evidence"
+            ? "No resolution evidence has been uploaded yet."
+            : "No original report photos available."}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <section className="evidence-photo-section">
+      <h4>{title}</h4>
+      <p className="muted">{description}</p>
+
+      <div className="evidence-gallery-grid">
+        {sectionPhotos.map((photo) => {
+          const index = photos.indexOf(photo);
+
+          return (
+            <button
+              className="evidence-gallery-tile"
+              type="button"
+              key={photo.id || `${photo.filePath}-${index}`}
+              onClick={() => setActiveIndex(index)}
+              aria-label={`View ${title} photo ${index + 1}`}
+            >
+              {brokenImages[photo.id || index] ? (
+                <span className="evidence-gallery-image-error">
+                  Image unavailable
+                </span>
+              ) : (
+                <img
+                  src={getMediaUrl(photo.filePath)}
+                  alt={`${title} photo`}
+                  loading="lazy"
+                  onError={() =>
+                    setBrokenImages((previous) => ({
+                      ...previous,
+                      [photo.id || index]: true,
+                    }))
+                  }
+                />
+              )}
+
+              <span
+                className={`evidence-gallery-tag ${
+                  photo.purpose === 1 ? "is-resolution" : ""
+                }`}
+              >
+                {photo.purpose === 1
+                  ? "AFTER — RESOLUTION"
+                  : "BEFORE — ORIGINAL REPORT"}
+              </span>
+
+              <span
+                className="evidence-gallery-expand"
+                aria-hidden="true"
+              >
+                ↗
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
   return (
     <section className="evidence-gallery" aria-labelledby="evidence-gallery-title">
@@ -101,32 +181,19 @@ function ReportGallery({ reportId }) {
             {reportAttachments > 0 && <span><span className="evidence-gallery-dot" /> {reportAttachments} original {reportAttachments === 1 ? "photo" : "photos"}</span>}
             {resolutionEvidence > 0 && <span><span className="evidence-gallery-dot is-resolution" /> {resolutionEvidence} resolution {resolutionEvidence === 1 ? "photo" : "photos"}</span>}
           </div>
-          <div className="evidence-gallery-grid">
-            {photos.map((photo, index) => (
-              <button
-                className="evidence-gallery-tile"
-                type="button"
-                key={photo.id || `${photo.filePath}-${index}`}
-                onClick={() => setActiveIndex(index)}
-                aria-label={`View photo ${index + 1} of ${photos.length}`}
-              >
-                {brokenImages[photo.id || index] ? (
-                  <span className="evidence-gallery-image-error">Image unavailable</span>
-                ) : (
-                  <img
-                    src={getMediaUrl(photo.filePath)}
-                    alt={`Evidence photo ${index + 1}`}
-                    loading="lazy"
-                    onError={() => setBrokenImages((previous) => ({ ...previous, [photo.id || index]: true }))}
-                  />
-                )}
-                <span className={`evidence-gallery-tag ${photo.purpose === 1 ? "is-resolution" : ""}`}>
-                  {photo.purpose === 1 ? "RESOLUTION EVIDENCE" : "REPORT EVIDENCE"}
-                </span>
-                <span className="evidence-gallery-expand" aria-hidden="true">↗</span>
-              </button>
-            ))}
-          </div>
+          <div className="evidence-before-after">
+  {renderPhotoSection(
+    "Original Report Photos",
+    "BEFORE — Photos submitted when the issue was reported.",
+    originalPhotos
+  )}
+
+  {renderPhotoSection(
+    "Resolution Evidence",
+    "AFTER — Photos showing the work completed.",
+    resolutionPhotos
+  )}
+</div>
           <p className="evidence-gallery-footnote">Select a photo to view it in full size.</p>
         </>
       )}
