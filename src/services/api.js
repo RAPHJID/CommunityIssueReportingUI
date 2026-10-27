@@ -68,3 +68,55 @@ export function getMediaUrl(filePath) {
   const apiOrigin = new URL(API_BASE_URL).origin;
   return new URL(filePath, apiOrigin).href;
 }
+
+export async function uploadResolutionEvidence(reportId, file) {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    throw new Error("Please sign in as an administrator.");
+  }
+
+  if (!file) {
+    throw new Error("Please select a photo.");
+  }
+
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error("Only JPG, PNG, and WEBP photos are allowed.");
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("The maximum photo size is 5 MB.");
+  }
+
+  const formData = new FormData();
+
+  formData.append("File", file);
+  formData.append("Purpose", "1");
+
+  const response = await fetch(
+    `${API_BASE_URL}/Media?reportId=${encodeURIComponent(reportId)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    throw new Error(
+      errorText || `Evidence upload failed (${response.status}).`
+    );
+  }
+
+  return response.json();
+}

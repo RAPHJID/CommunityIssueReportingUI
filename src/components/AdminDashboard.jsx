@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import "./AdminDashboard.css";
+import ResolutionEvidenceUpload from "./ResolutionEvidenceUpload";
 
 const FILTERS = [
   "All Reports",
@@ -293,6 +294,12 @@ export default function AdminDashboard({
                         Reported {formatDate(report.createdAt)}
                       </small>
 
+                      {currentStatus === "In Progress" && (
+  <ResolutionEvidenceUpload
+    reportId={report.id}
+  />
+)}
+
                       {editing && (
                         <form
                           className="admin-status-form"
@@ -300,6 +307,7 @@ export default function AdminDashboard({
                             submitStatus(e, report.id)
                           }
                         >
+
                           <h4>Update report status</h4>
 
                           <label
