@@ -54,37 +54,37 @@ function createStatusIcon(status) {
   });
 }
 
-function MapBounds({ points, boundary }) {
+function isInsideWard(latitude, longitude, boundary) {
+  if (!boundary) return false;
+
+  const point = L.latLng(latitude, longitude);
+  const layer = L.geoJSON(boundary);
+  const bounds = layer.getBounds();
+
+  return bounds.isValid() && bounds.contains(point);
+}
+
+function MapBounds({ boundary }) {
   const map = useMap();
 
   useEffect(() => {
-    if (points.length > 0) {
-      const bounds = L.latLngBounds(
-        points.map((point) => [
-          point.latitude,
-          point.longitude,
-        ])
-      );
-
-      map.fitBounds(bounds, {
-        padding: [45, 45],
-        maxZoom: 15,
-      });
-
+    if (!boundary) {
+      map.setView(NDENDERU_CENTER, 13);
       return;
     }
 
-    if (boundary) {
-      const layer = L.geoJSON(boundary);
-      const bounds = layer.getBounds();
+    const layer = L.geoJSON(boundary);
+    const bounds = layer.getBounds();
 
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, {
-          padding: [25, 25],
-        });
-      }
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, {
+        padding: [30, 30],
+        maxZoom: 14,
+      });
+    } else {
+      map.setView(NDENDERU_CENTER, 13);
     }
-  }, [map, points, boundary]);
+  }, [map, boundary]);
 
   return null;
 }
@@ -210,6 +210,8 @@ export default function CommunityIssuesMap({
         const latitude = Number(location.latitude);
         const longitude = Number(location.longitude);
 
+
+
         if (
           location.latitude == null ||
           location.longitude == null ||
@@ -222,6 +224,13 @@ export default function CommunityIssuesMap({
         ) {
           return null;
         }
+
+        if (
+  boundary &&
+  !isInsideWard(latitude, longitude, boundary)
+) {
+  return null;
+}
 
         return {
           ...report,
@@ -236,7 +245,7 @@ export default function CommunityIssuesMap({
         };
       })
       .filter(Boolean);
-  }, [reports, locations, getStatusLabel]);
+  }, [reports, locations, getStatusLabel, boundary]);
 
   // ==========================================
   // SEARCH AND STATUS FILTERS
@@ -264,7 +273,7 @@ export default function CommunityIssuesMap({
 
       return matchesStatus && matchesSearch;
     });
-  }, [mappedReports, selectedStatus, search]);
+  }, [mappedReports, selectedStatus, search, boundary]);
 
   const totalResolved = mappedReports.filter(
     (report) => report.status === "Resolved"
@@ -453,10 +462,7 @@ export default function CommunityIssuesMap({
                 </Marker>
               ))}
 
-              <MapBounds
-                points={visibleReports}
-                boundary={boundary}
-              />
+              <MapBounds boundary={boundary} />
             </MapContainer>
           </div>
 
