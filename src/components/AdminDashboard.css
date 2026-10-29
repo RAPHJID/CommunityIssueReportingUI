@@ -311,3 +311,125 @@
     font-size: 1.4rem;
   }
 }
+
+
+/* ==========================================
+   FIX ADMIN MAP INPUT AND DROPDOWN COLORS
+========================================== */
+
+.admin-dashboard .admin-map-controls input,
+.admin-dashboard .admin-map-controls select {
+  background-color: #ffffff;
+  color: #20382b;
+  -webkit-text-fill-color: #20382b;
+  border: 1px solid #b8cbbf;
+  color-scheme: light;
+}
+
+.admin-dashboard .admin-map-controls input::placeholder {
+  color: #64748b;
+  -webkit-text-fill-color: #64748b;
+  opacity: 1;
+}
+
+.admin-dashboard .admin-map-controls select option {
+  background-color: #ffffff;
+  color: #20382b;
+}
+
+.admin-dashboard .admin-map-controls input:focus,
+.admin-dashboard .admin-map-controls select:focus {
+  outline: 2px solid #16835d;
+  outline-offset: 2px;
+  border-color: #16835d;
+}
+/* ==========================================
+   NDENDERU WARD AREA SEARCH
+========================================== */
+
+.admin-area-search {
+  margin: 1.5rem 0;
+  padding: 1.2rem;
+  border: 1px solid #dbe6dc;
+  border-radius: 12px;
+  background: #f8faf9;
+}
+
+.admin-area-search h4 {
+  margin: 0 0 0.9rem;
+  color: #173d2d;
+}
+
+.admin-area-search form {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.admin-area-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid #b8cbbf;
+  border-radius: 8px;
+  background: #fff;
+  color: #20382b;
+  -webkit-text-fill-color: #20382b;
+  color-scheme: light;
+  font: inherit;
+}
+
+.admin-area-search input::placeholder {
+  color: #64748b;
+  -webkit-text-fill-color: #64748b;
+}
+
+.admin-area-search form button {
+  padding: 0.85rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  background: #16835d;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-area-search form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-area-results {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+}
+
+.admin-area-results button {
+  padding: 0.8rem;
+  border: 1px solid #dbe6dc;
+  border-radius: 8px;
+  background: #fff;
+  color: #20382b;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-area-results button:hover {
+  background: #eaf5ee;
+}
+
+.admin-area-error {
+  margin-top: 0.8rem;
+  color: #a51f25;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 650px) {
+  .admin-area-search form {
+    flex-direction: column;
+  }
+
+  .admin-area-search form button {
+    width: 100%;
+  }
+}

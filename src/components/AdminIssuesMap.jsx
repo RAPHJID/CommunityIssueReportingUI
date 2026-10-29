@@ -9,8 +9,17 @@ import {
   useMap,
 } from "react-leaflet";
 import L from "leaflet";
+import {
+  booleanPointInPolygon,
+  point,
+} from "@turf/turf";
+
 import { apiRequest } from "../services/api";
 import "leaflet/dist/leaflet.css";
+
+// ==========================================
+// MAP CONFIGURATION
+// ==========================================
 
 const CENTER = [-1.1885, 36.75];
 
@@ -32,6 +41,10 @@ const CLOSED_STATUSES = [
   "Out of Jurisdiction",
 ];
 
+// ==========================================
+// MARKER ICON
+// ==========================================
+
 function createMarkerIcon(status) {
   const color = STATUS_COLORS[status] || "#64748b";
 
@@ -48,14 +61,76 @@ function createMarkerIcon(status) {
   });
 }
 
+// ==========================================
+// GEOJSON WARD VALIDATION
+// ==========================================
+
+function getWardPolygons(boundary) {
+  if (!boundary) return [];
+
+  if (boundary.type === "FeatureCollection") {
+    return boundary.features.filter(
+      (feature) =>
+        feature?.geometry?.type === "Polygon" ||
+        feature?.geometry?.type === "MultiPolygon"
+    );
+  }
+
+  if (boundary.type === "Feature") {
+    return ["Polygon", "MultiPolygon"].includes(
+      boundary.geometry?.type
+    )
+      ? [boundary]
+      : [];
+  }
+
+  if (
+    boundary.type === "Polygon" ||
+    boundary.type === "MultiPolygon"
+  ) {
+    return [
+      {
+        type: "Feature",
+        properties: {},
+        geometry: boundary,
+      },
+    ];
+  }
+
+  return [];
+}
+
+function isInsideNdenderu(latitude, longitude, boundary) {
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude)
+  ) {
+    return false;
+  }
+
+  try {
+    const locationPoint = point([
+      longitude,
+      latitude,
+    ]);
+
+    return getWardPolygons(boundary).some((polygon) =>
+      booleanPointInPolygon(locationPoint, polygon)
+    );
+  } catch {
+    return false;
+  }
+}
+
+// ==========================================
+// INITIAL MAP POSITION
+// ==========================================
+
 function FitWard({ boundary }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!boundary) {
-      map.setView(CENTER, 13);
-      return;
-    }
+    if (!boundary) return;
 
     const bounds = L.geoJSON(boundary).getBounds();
 
@@ -70,6 +145,35 @@ function FitWard({ boundary }) {
   return null;
 }
 
+// ==========================================
+// ZOOM TO SEARCHED AREA
+// ==========================================
+
+function FlyToArea({ selectedArea }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!selectedArea) return;
+
+    map.flyTo(
+      [
+        selectedArea.latitude,
+        selectedArea.longitude,
+      ],
+      16,
+      {
+        duration: 1.2,
+      }
+    );
+  }, [map, selectedArea]);
+
+  return null;
+}
+
+// ==========================================
+// ADMIN ISSUES MAP
+// ==========================================
+
 export default function AdminIssuesMap({
   reports = [],
   getStatusLabel,
@@ -77,6 +181,8 @@ export default function AdminIssuesMap({
   onOpenReport,
   onManageReport,
 }) {
+  // REFERENCE DATA
+
   const [locations, setLocations] = useState([]);
   const [categories, setCategories] = useState([]);
   const [boundary, setBoundary] = useState(null);
@@ -85,9 +191,25 @@ export default function AdminIssuesMap({
   const [error, setError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
 
+  // REPORT FILTERS
+
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("Unresolved");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] =
+    useState("Unresolved");
+  const [categoryFilter, setCategoryFilter] =
+    useState("all");
+
+  // AREA SEARCH
+
+  const [areaSearch, setAreaSearch] = useState("");
+  const [areaResults, setAreaResults] = useState([]);
+  const [areaLoading, setAreaLoading] = useState(false);
+  const [areaError, setAreaError] = useState("");
+  const [selectedArea, setSelectedArea] = useState(null);
+
+  // ==========================================
+  // LOAD LOCATIONS AND CATEGORIES
+  // ==========================================
 
   useEffect(() => {
     let cancelled = false;
@@ -97,16 +219,19 @@ export default function AdminIssuesMap({
       setError("");
 
       try {
-        const [locationData, categoryData] = await Promise.all([
-          apiRequest("/Location"),
-          apiRequest("/Category"),
-        ]);
+        const [locationData, categoryData] =
+          await Promise.all([
+            apiRequest("/Location"),
+            apiRequest("/Category"),
+          ]);
 
         if (
           !Array.isArray(locationData) ||
           !Array.isArray(categoryData)
         ) {
-          throw new Error("Invalid map reference data.");
+          throw new Error(
+            "Invalid map reference data."
+          );
         }
 
         if (!cancelled) {
@@ -116,7 +241,8 @@ export default function AdminIssuesMap({
       } catch (err) {
         if (!cancelled) {
           setError(
-            err.message || "Unable to load admin map data."
+            err.message ||
+              "Unable to load admin map data."
           );
         }
       } finally {
@@ -133,6 +259,10 @@ export default function AdminIssuesMap({
     };
   }, [retryKey]);
 
+  // ==========================================
+  // LOAD NDENDERU WARD BOUNDARY
+  // ==========================================
+
   useEffect(() => {
     let cancelled = false;
 
@@ -143,16 +273,29 @@ export default function AdminIssuesMap({
         );
 
         if (!response.ok) {
-          throw new Error("Ward boundary unavailable.");
+          throw new Error(
+            "Unable to load Ndenderu Ward boundary."
+          );
         }
 
         const data = await response.json();
+
+        if (getWardPolygons(data).length === 0) {
+          throw new Error(
+            "The Ndenderu Ward boundary is invalid."
+          );
+        }
 
         if (!cancelled) {
           setBoundary(data);
         }
       } catch (err) {
-        console.warn("Admin map boundary:", err);
+        if (!cancelled) {
+          setError(
+            err.message ||
+              "Unable to load the ward boundary."
+          );
+        }
       }
     }
 
@@ -163,7 +306,101 @@ export default function AdminIssuesMap({
     };
   }, []);
 
+  // ==========================================
+  // SEARCH FOR AN AREA WITHIN NDENDERU
+  // ==========================================
+
+  async function searchNdenderuArea(event) {
+    event.preventDefault();
+
+    const query = areaSearch.trim();
+
+    if (!query) {
+      setAreaError("Enter an area name.");
+      return;
+    }
+
+    if (!boundary) {
+      setAreaError(
+        "Ndenderu Ward boundary is not available."
+      );
+      return;
+    }
+
+    if (areaLoading) return;
+
+    setAreaLoading(true);
+    setAreaError("");
+    setAreaResults([]);
+
+    try {
+      const params = new URLSearchParams({
+        q: `${query}, Kiambu County, Kenya`,
+        format: "jsonv2",
+        addressdetails: "1",
+        limit: "10",
+        countrycodes: "ke",
+      });
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+        {
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Location search is temporarily unavailable."
+        );
+      }
+
+      const results = await response.json();
+
+      if (!Array.isArray(results)) {
+        throw new Error(
+          "Unexpected location search response."
+        );
+      }
+
+      const withinWard = results.filter((result) => {
+        const latitude = Number(result.lat);
+        const longitude = Number(result.lon);
+
+        return isInsideNdenderu(
+          latitude,
+          longitude,
+          boundary
+        );
+      });
+
+      if (withinWard.length === 0) {
+        setAreaError(
+          "No matching location was found inside Ndenderu Ward. Try another local area or landmark."
+        );
+        return;
+      }
+
+      setAreaResults(withinWard);
+    } catch (err) {
+      setAreaError(
+        err.message ||
+          "Unable to search for this area."
+      );
+    } finally {
+      setAreaLoading(false);
+    }
+  }
+
+  // ==========================================
+  // JOIN REPORTS WITH LOCATIONS
+  // ==========================================
+
   const mappedReports = useMemo(() => {
+    if (!boundary) return [];
+
     const locationLookup = new Map(
       locations.map((location) => [
         String(location.id).toLowerCase(),
@@ -177,10 +414,6 @@ export default function AdminIssuesMap({
         category.name,
       ])
     );
-
-    const wardBounds = boundary
-      ? L.geoJSON(boundary).getBounds()
-      : null;
 
     return reports
       .map((report) => {
@@ -203,18 +436,17 @@ export default function AdminIssuesMap({
         if (
           !Number.isFinite(latitude) ||
           !Number.isFinite(longitude) ||
-          latitude < -90 ||
-          latitude > 90 ||
-          longitude < -180 ||
-          longitude > 180
+          (latitude === 0 && longitude === 0)
         ) {
           return null;
         }
 
         if (
-          wardBounds &&
-          (!wardBounds.isValid() ||
-            !wardBounds.contains([latitude, longitude]))
+          !isInsideNdenderu(
+            latitude,
+            longitude,
+            boundary
+          )
         ) {
           return null;
         }
@@ -223,7 +455,9 @@ export default function AdminIssuesMap({
           ...report,
           latitude,
           longitude,
-          status: getStatusLabel(report.currentStatus),
+          status: getStatusLabel(
+            report.currentStatus
+          ),
           categoryName:
             categoryLookup.get(
               String(report.categoryId || "").toLowerCase()
@@ -236,7 +470,17 @@ export default function AdminIssuesMap({
         };
       })
       .filter(Boolean);
-  }, [reports, locations, categories, boundary, getStatusLabel]);
+  }, [
+    reports,
+    locations,
+    categories,
+    boundary,
+    getStatusLabel,
+  ]);
+
+  // ==========================================
+  // FILTER MAPPED REPORTS
+  // ==========================================
 
   const visibleReports = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -245,12 +489,16 @@ export default function AdminIssuesMap({
       const matchesStatus =
         statusFilter === "All Reports" ||
         (statusFilter === "Unresolved"
-          ? !CLOSED_STATUSES.includes(report.status)
+          ? !CLOSED_STATUSES.includes(
+              report.status
+            )
           : report.status === statusFilter);
 
       const matchesCategory =
         categoryFilter === "all" ||
-        String(report.categoryId || "").toLowerCase() ===
+        String(
+          report.categoryId || ""
+        ).toLowerCase() ===
           categoryFilter.toLowerCase();
 
       const searchableText = [
@@ -266,22 +514,39 @@ export default function AdminIssuesMap({
       return (
         matchesStatus &&
         matchesCategory &&
-        (!query || searchableText.includes(query))
+        (!query ||
+          searchableText.includes(query))
       );
     });
-  }, [mappedReports, search, statusFilter, categoryFilter]);
+  }, [
+    mappedReports,
+    search,
+    statusFilter,
+    categoryFilter,
+  ]);
+
+  // ==========================================
+  // MAP STATISTICS
+  // ==========================================
 
   const unresolvedCount = mappedReports.filter(
-    (report) => !CLOSED_STATUSES.includes(report.status)
+    (report) =>
+      !CLOSED_STATUSES.includes(report.status)
   ).length;
 
   const inProgressCount = mappedReports.filter(
-    (report) => report.status === "In Progress"
+    (report) =>
+      report.status === "In Progress"
   ).length;
 
   const resolvedCount = mappedReports.filter(
-    (report) => report.status === "Resolved"
+    (report) =>
+      report.status === "Resolved"
   ).length;
+
+  // ==========================================
+  // RENDER
+  // ==========================================
 
   return (
     <section
@@ -299,37 +564,51 @@ export default function AdminIssuesMap({
           </h3>
 
           <p className="muted">
-            Locate community complaints, identify unresolved
-            issues, and open reports for action.
+            Locate community complaints, identify
+            unresolved issues, and open reports
+            for action.
           </p>
         </div>
       </div>
 
+      {/* MAP STATISTICS */}
+
       <div className="admin-map-stats">
         <div>
           <span>Mapped reports</span>
-          <strong>{mappedReports.length}</strong>
+          <strong>
+            {mappedReports.length}
+          </strong>
         </div>
 
         <div>
           <span>Unresolved</span>
-          <strong>{unresolvedCount}</strong>
+          <strong>
+            {unresolvedCount}
+          </strong>
         </div>
 
         <div>
           <span>In progress</span>
-          <strong>{inProgressCount}</strong>
+          <strong>
+            {inProgressCount}
+          </strong>
         </div>
 
         <div>
           <span>Resolved</span>
-          <strong>{resolvedCount}</strong>
+          <strong>
+            {resolvedCount}
+          </strong>
         </div>
       </div>
 
+      {/* REPORT FILTERS */}
+
       <div className="admin-map-controls">
         <label>
-          Search map
+          Search reports
+
           <input
             type="search"
             value={search}
@@ -342,10 +621,13 @@ export default function AdminIssuesMap({
 
         <label>
           Status
+
           <select
             value={statusFilter}
             onChange={(event) =>
-              setStatusFilter(event.target.value)
+              setStatusFilter(
+                event.target.value
+              )
             }
           >
             <option value="Unresolved">
@@ -356,8 +638,13 @@ export default function AdminIssuesMap({
               All Reports
             </option>
 
-            {Object.keys(STATUS_COLORS).map((status) => (
-              <option key={status} value={status}>
+            {Object.keys(
+              STATUS_COLORS
+            ).map((status) => (
+              <option
+                key={status}
+                value={status}
+              >
                 {status}
               </option>
             ))}
@@ -366,10 +653,13 @@ export default function AdminIssuesMap({
 
         <label>
           Category
+
           <select
             value={categoryFilter}
             onChange={(event) =>
-              setCategoryFilter(event.target.value)
+              setCategoryFilter(
+                event.target.value
+              )
             }
           >
             <option value="all">
@@ -388,18 +678,102 @@ export default function AdminIssuesMap({
         </label>
       </div>
 
+      {/* NDENDERU WARD AREA SEARCH */}
+
+      <div className="admin-area-search">
+        <h4>
+          Find an area in Ndenderu Ward
+        </h4>
+
+        <form onSubmit={searchNdenderuArea}>
+          <input
+            type="search"
+            value={areaSearch}
+            onChange={(event) => {
+              setAreaSearch(
+                event.target.value
+              );
+              setAreaResults([]);
+              setAreaError("");
+            }}
+            placeholder="Search an area or landmark..."
+            aria-label="Search within Ndenderu Ward"
+          />
+
+          <button
+            type="submit"
+            disabled={
+              areaLoading ||
+              !boundary
+            }
+          >
+            {areaLoading
+              ? "Searching..."
+              : "Find area"}
+          </button>
+        </form>
+
+        {areaError && (
+          <p
+            className="admin-area-error"
+            role="alert"
+          >
+            {areaError}
+          </p>
+        )}
+
+        {areaResults.length > 0 && (
+          <div className="admin-area-results">
+            {areaResults.map((result) => (
+              <button
+                key={result.place_id}
+                type="button"
+                onClick={() => {
+                  setSelectedArea({
+                    latitude: Number(
+                      result.lat
+                    ),
+                    longitude: Number(
+                      result.lon
+                    ),
+                  });
+
+                  setAreaSearch(
+                    result.display_name
+                  );
+                  setAreaResults([]);
+                  setAreaError("");
+                }}
+              >
+                📍 {result.display_name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* MAP */}
+
       {loading ? (
-        <div className="state-box" role="status">
+        <div
+          className="state-box"
+          role="status"
+        >
           Loading admin map...
         </div>
       ) : error ? (
-        <div className="state-box" role="alert">
+        <div
+          className="state-box"
+          role="alert"
+        >
           <p>{error}</p>
 
           <button
             type="button"
             onClick={() =>
-              setRetryKey((value) => value + 1)
+              setRetryKey(
+                (value) => value + 1
+              )
             }
           >
             Retry map
@@ -432,101 +806,130 @@ export default function AdminIssuesMap({
                 />
               )}
 
-              {visibleReports.map((report) => (
-                <Marker
-                  key={report.id}
-                  position={[
-                    report.latitude,
-                    report.longitude,
-                  ]}
-                  icon={createMarkerIcon(report.status)}
-                >
-                  <Popup>
-                    <div className="admin-map-popup">
-                      <strong>{report.title}</strong>
+              {visibleReports.map(
+                (report) => (
+                  <Marker
+                    key={report.id}
+                    position={[
+                      report.latitude,
+                      report.longitude,
+                    ]}
+                    icon={createMarkerIcon(
+                      report.status
+                    )}
+                  >
+                    <Popup>
+                      <div className="admin-map-popup">
+                        <strong>
+                          {report.title}
+                        </strong>
 
-                      <span
-                        style={{
-                          color:
-                            STATUS_COLORS[report.status] ||
-                            "#64748b",
-                        }}
-                      >
-                        ● {report.status}
-                      </span>
+                        <span
+                          style={{
+                            color:
+                              STATUS_COLORS[
+                                report.status
+                              ] || "#64748b",
+                          }}
+                        >
+                          ● {report.status}
+                        </span>
 
-                      <p>
-                        {report.description
-                          ? report.description.slice(0, 140)
-                          : "No description provided."}
-                      </p>
+                        <p>
+                          {report.description
+                            ? report.description.slice(
+                                0,
+                                140
+                              )
+                            : "No description provided."}
+                        </p>
 
-                      <small>
-                        Category: {report.categoryName}
-                      </small>
+                        <small>
+                          Category:{" "}
+                          {report.categoryName}
+                        </small>
 
-                      <small>{report.locationName}</small>
+                        <small>
+                          {report.locationName}
+                        </small>
 
-                      <small>
-                        Reported {formatDate(report.createdAt)}
-                      </small>
+                        <small>
+                          Reported{" "}
+                          {formatDate(
+                            report.createdAt
+                          )}
+                        </small>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onOpenReport(report.id)
-                        }
-                      >
-                        View report details
-                      </button>
-
-                      {!CLOSED_STATUSES.includes(
-                        report.status
-                      ) && (
                         <button
                           type="button"
-                          className="admin-map-manage-button"
                           onClick={() =>
-                            onManageReport(report.id)
+                            onOpenReport(
+                              report.id
+                            )
                           }
                         >
-                          Manage report status
+                          View report details
                         </button>
-                      )}
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
+
+                        {!CLOSED_STATUSES.includes(
+                          report.status
+                        ) && (
+                          <button
+                            type="button"
+                            className="admin-map-manage-button"
+                            onClick={() =>
+                              onManageReport(
+                                report.id
+                              )
+                            }
+                          >
+                            Manage report status
+                          </button>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                )
+              )}
 
               <FitWard boundary={boundary} />
+
+              <FlyToArea
+                selectedArea={selectedArea}
+              />
             </MapContainer>
           </div>
 
+          {/* MAP FOOTER */}
+
           <div className="admin-map-footer">
             <p>
-              Showing {visibleReports.length} of{" "}
-              {mappedReports.length} mapped reports
+              Showing{" "}
+              {visibleReports.length} of{" "}
+              {mappedReports.length} mapped
+              reports
             </p>
 
             <div className="admin-map-legend">
-              {Object.entries(STATUS_COLORS).map(
-                ([status, color]) => (
-                  <span key={status}>
-                    <i
-                      style={{
-                        backgroundColor: color,
-                      }}
-                    />
-                    {status}
-                  </span>
-                )
-              )}
+              {Object.entries(
+                STATUS_COLORS
+              ).map(([status, color]) => (
+                <span key={status}>
+                  <i
+                    style={{
+                      backgroundColor: color,
+                    }}
+                  />
+                  {status}
+                </span>
+              ))}
             </div>
           </div>
 
           {mappedReports.length === 0 && (
             <p className="muted">
-              No reports with valid mapped locations are
+              No reports with valid locations
+              inside Ndenderu Ward are
               available yet.
             </p>
           )}
@@ -534,7 +937,8 @@ export default function AdminIssuesMap({
           {mappedReports.length > 0 &&
             visibleReports.length === 0 && (
               <p className="muted">
-                No mapped reports match your filters.
+                No mapped reports match
+                your filters.
               </p>
             )}
         </>
