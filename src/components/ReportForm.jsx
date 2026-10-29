@@ -8,7 +8,6 @@ function getOptionId(item) {
   return item?.id ?? item?.categoryId ?? item?.locationId ?? "";
 }
 
-
 function getOptionName(item) {
   return (
     item?.name ??
@@ -19,6 +18,25 @@ function getOptionName(item) {
   );
 }
 
+function isOtherCategory(name) {
+  return /\b(other|general|miscellaneous)\b/i.test(name || "");
+}
+
+function getCategoryIcon(name) {
+  const value = (name || "").toLowerCase();
+
+  if (/road|pothole|transport|drainage/.test(value)) return "🛣️";
+  if (/water|pipe|supply/.test(value)) return "💧";
+  if (/garbage|waste|sanitation|sewage/.test(value)) return "♻️";
+  if (/light|electric|power/.test(value)) return "💡";
+  if (/health|hospital|clinic/.test(value)) return "🏥";
+  if (/school|education/.test(value)) return "🏫";
+  if (/security|safety|crime/.test(value)) return "🛡️";
+  if (/environment|tree|pollution/.test(value)) return "🌱";
+  if (isOtherCategory(value)) return "❓";
+
+  return "📍";
+}
 
 function ReportForm({ onReportCreated, onCancel }) {
   const [title, setTitle] = useState("");
@@ -41,6 +59,14 @@ function ReportForm({ onReportCreated, onCancel }) {
   const [submitError, setSubmitError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const selectedCategory = categories.find(
+    (category) => String(getOptionId(category)) === String(categoryId)
+  );
+
+  const selectedCategoryIsOther = isOtherCategory(
+    getOptionName(selectedCategory)
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -65,10 +91,16 @@ function ReportForm({ onReportCreated, onCancel }) {
 
         setCategories(categoryData);
         setLocations(locationData);
+
         try {
           const wardData = await apiRequest("/Ward");
-          if (!cancelled && Array.isArray(wardData)) setWards(wardData);
-        } catch (wardError) { console.error("Unable to load wards:", wardError); }
+
+          if (!cancelled && Array.isArray(wardData)) {
+            setWards(wardData);
+          }
+        } catch (wardError) {
+          console.error("Unable to load wards:", wardError);
+        }
       } catch (err) {
         if (!cancelled) {
           setOptionsError(
@@ -91,6 +123,7 @@ function ReportForm({ onReportCreated, onCancel }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+
     if (isSubmitting) return;
 
     setSubmitError("");
@@ -105,25 +138,48 @@ function ReportForm({ onReportCreated, onCancel }) {
         return;
       }
 
-      if (cleanDescription.length < 10 || cleanDescription.length > 2000) {
-        setSubmitError("The description must be between 10 and 2,000 characters.");
+      if (
+        cleanDescription.length < 10 ||
+        cleanDescription.length > 2000
+      ) {
+        setSubmitError(
+          "The description must be between 10 and 2,000 characters."
+        );
         return;
       }
 
-      if (!categoryId || (locationMode === "existing" ? !locationId : (!mapPoint || !wardId))) {
-        setSubmitError(locationMode === "existing" ? "Please select both a category and a location." : "Please select a category, ward, and a point on the map.");
+      if (!categoryId) {
+        setSubmitError("Please choose an issue category.");
+        return;
+      }
+
+      if (locationMode === "existing" && !locationId) {
+        setSubmitError("Please choose an issue location.");
+        return;
+      }
+
+      if (
+        locationMode === "map" &&
+        (!mapPoint || !wardId)
+      ) {
+        setSubmitError(
+          "Please select a ward and a point on the map."
+        );
         return;
       }
     }
 
     setIsSubmitting(true);
+
     let reportId = savedReportId;
 
     try {
       if (!reportId) {
         let finalLocationId = locationId;
+
         if (locationMode === "map") {
           finalLocationId = createdPinId;
+
           if (!finalLocationId) {
             const pin = await apiRequest("/Location/report-pin", {
               method: "POST",
@@ -131,14 +187,23 @@ function ReportForm({ onReportCreated, onCancel }) {
                 latitude: mapPoint.latitude,
                 longitude: mapPoint.longitude,
                 accuracyMeters: mapPoint.accuracyMeters,
-                wardId, areaId: null, description: locationDescription.trim() || null
-              })
+                wardId,
+                areaId: null,
+                description: locationDescription.trim() || null,
+              }),
             });
-            if (!pin?.id) throw new Error("Location was not saved. Please retry.");
+
+            if (!pin?.id) {
+              throw new Error(
+                "Location was not saved. Please retry."
+              );
+            }
+
             finalLocationId = pin.id;
             setCreatedPinId(pin.id);
           }
         }
+
         const createdReport = await apiRequest("/Report", {
           method: "POST",
           body: JSON.stringify({
@@ -160,6 +225,7 @@ function ReportForm({ onReportCreated, onCancel }) {
       }
 
       const failedPhotos = [];
+
       for (const photo of photos) {
         try {
           await uploadReportPhoto(reportId, photo);
@@ -171,10 +237,14 @@ function ReportForm({ onReportCreated, onCancel }) {
 
       if (failedPhotos.length) {
         setPhotos(failedPhotos);
+
         setSubmitError(
           `Report saved, but ${failedPhotos.length} photo(s) could not be confirmed as uploaded. You can retry the remaining photos, but check the report first to avoid duplicate images.`
         );
-        setSuccessMessage("Your community report was created successfully.");
+
+        setSuccessMessage(
+          "Your community report was created successfully."
+        );
       } else {
         setSavedReportId(null);
         setPhotos([]);
@@ -187,32 +257,48 @@ function ReportForm({ onReportCreated, onCancel }) {
         setWardId("");
         setLocationDescription("");
         setLocationMode("existing");
-        setSuccessMessage("Your report and photos were submitted successfully.");
+
+        setSuccessMessage(
+          "Your report and photos were submitted successfully."
+        );
       }
 
       if (onReportCreated) {
         try {
           await onReportCreated();
         } catch (refreshError) {
-          console.error("Unable to refresh reports:", refreshError);
+          console.error(
+            "Unable to refresh reports:",
+            refreshError
+          );
         }
       }
     } catch (err) {
-      setSubmitError(err.message || "Unable to submit your report.");
+      setSubmitError(
+        err.message || "Unable to submit your report."
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <section className="report-form-panel" aria-labelledby="report-form-title">
+    <section
+      className="report-form-panel"
+      aria-labelledby="report-form-title"
+    >
       <div className="report-form-visual">
-        <div className="report-form-brand" aria-hidden="true">
+        <div
+          className="report-form-brand"
+          aria-hidden="true"
+        >
           <span>W</span>
           <i />
         </div>
 
-        <p className="report-form-kicker">COMMUNITY · ACTION · CHANGE</p>
+        <p className="report-form-kicker">
+          COMMUNITY · ACTION · CHANGE
+        </p>
 
         <h2 className="report-form-visual-heading">
           See an issue?
@@ -221,15 +307,21 @@ function ReportForm({ onReportCreated, onCancel }) {
         </h2>
 
         <p className="report-form-visual-copy">
-          Every useful report starts with a clear description and the right
-          location. Help your community understand what needs attention.
+          Every useful report starts with a clear description
+          and the right location. Help your community
+          understand what needs attention.
         </p>
 
-        <div className="report-form-illustration" aria-hidden="true">
+        <div
+          className="report-form-illustration"
+          aria-hidden="true"
+        >
           <div className="report-form-ring ring-one" />
           <div className="report-form-ring ring-two" />
           <div className="report-form-ring ring-three" />
-          <div className="report-form-illustration-core">+</div>
+          <div className="report-form-illustration-core">
+            +
+          </div>
           <span className="report-form-orbit-dot dot-one" />
           <span className="report-form-orbit-dot dot-two" />
           <span className="report-form-orbit-dot dot-three" />
@@ -243,7 +335,9 @@ function ReportForm({ onReportCreated, onCancel }) {
 
       <div className="report-form-content">
         <div className="report-form-topline">
-          <span className="report-form-step">01 / NEW REPORT</span>
+          <span className="report-form-step">
+            01 / NEW REPORT
+          </span>
 
           <button
             type="button"
@@ -256,25 +350,37 @@ function ReportForm({ onReportCreated, onCancel }) {
         </div>
 
         <div className="report-form-intro">
-          <p className="report-form-overline">YOUR VOICE MATTERS</p>
+          <p className="report-form-overline">
+            YOUR VOICE MATTERS
+          </p>
+
           <h2 id="report-form-title">
             Report an issue<span>.</span>
           </h2>
+
           <p>
-            Tell us what is happening and where the community needs attention.
+            Tell us what is happening and where the
+            community needs attention.
           </p>
         </div>
 
         {successMessage && (
-          <div className="report-form-success" role="status">
+          <div
+            className="report-form-success"
+            role="status"
+          >
             <span aria-hidden="true">✓</span>
             <p>{successMessage}</p>
           </div>
         )}
 
         {optionsError && (
-          <div className="report-form-error" role="alert">
+          <div
+            className="report-form-error"
+            role="alert"
+          >
             <p>{optionsError}</p>
+
             <button
               type="button"
               onClick={() => window.location.reload()}
@@ -284,10 +390,18 @@ function ReportForm({ onReportCreated, onCancel }) {
           </div>
         )}
 
-        <form className="report-form-fields" onSubmit={handleSubmit}>
+        <form
+          className="report-form-fields"
+          onSubmit={handleSubmit}
+        >
+          {/* REPORT TITLE */}
+
           <div className="report-form-field">
             <div className="report-form-label-row">
-              <label htmlFor="report-title">Report title</label>
+              <label htmlFor="report-title">
+                Report title
+              </label>
+
               <span>{title.length}/255</span>
             </div>
 
@@ -295,101 +409,356 @@ function ReportForm({ onReportCreated, onCancel }) {
               id="report-title"
               type="text"
               value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={(event) =>
+                setTitle(event.target.value)
+              }
               placeholder="e.g. Damaged road near the market"
               minLength={5}
               maxLength={255}
               required
-              disabled={isSubmitting || Boolean(savedReportId)}
+              disabled={
+                isSubmitting || Boolean(savedReportId)
+              }
             />
+
             <p className="report-form-hint">
               Summarise the issue in one clear sentence.
             </p>
           </div>
 
+          {/* DESCRIPTION */}
+
           <div className="report-form-field">
             <div className="report-form-label-row">
-              <label htmlFor="report-description">What happened?</label>
+              <label htmlFor="report-description">
+                What happened?
+              </label>
+
               <span>{description.length}/2000</span>
             </div>
 
             <textarea
               id="report-description"
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={(event) =>
+                setDescription(event.target.value)
+              }
               placeholder="Describe the problem, its impact, and any useful details..."
               minLength={10}
               maxLength={2000}
               rows={4}
               required
-              disabled={isSubmitting || Boolean(savedReportId)}
+              disabled={
+                isSubmitting || Boolean(savedReportId)
+              }
             />
+
             <p className="report-form-hint">
-              Include enough detail to help others understand the issue.
+              Include enough detail to help others
+              understand the issue.
             </p>
           </div>
 
+          {/* CATEGORY CARDS */}
+
           <div className="report-form-field">
-            <label htmlFor="report-category">Issue category</label>
+            <div className="report-category-heading">
+              <div>
+                <h3 id="report-category-heading">
+                  What type of issue is this?
+                </h3>
 
-            <div className="report-form-select-wrap">
-              <select
-                id="report-category"
-                value={categoryId}
-                onChange={(event) => setCategoryId(event.target.value)}
-                required
-                disabled={loadingOptions || isSubmitting || Boolean(savedReportId)}
-              >
-                <option value="">
-                  {loadingOptions ? "Loading categories..." : "Choose a category"}
-                </option>
+                <p>
+                  Choose the category that best describes
+                  the problem.
+                </p>
+              </div>
 
-                {categories.map((category) => {
-                  const id = getOptionId(category);
-                  const name = getOptionName(category);
-
-                  return id && name ? (
-                    <option key={id} value={id}>
-                      {name}
-                    </option>
-                  ) : null;
-                })}
-              </select>
+              <span className="report-category-required">
+                Required
+              </span>
             </div>
+
+            {loadingOptions ? (
+              <p
+                className="report-form-hint"
+                role="status"
+              >
+                Loading issue categories...
+              </p>
+            ) : categories.length === 0 ? (
+              <p className="report-form-hint">
+                No categories are available yet.
+                Please contact the administrator.
+              </p>
+            ) : (
+              <div
+                className="report-category-grid"
+                role="radiogroup"
+                aria-labelledby="report-category-heading"
+                aria-required="true"
+              >
+                {categories
+                  .filter((category) => {
+                    const id = getOptionId(category);
+                    const name = getOptionName(category);
+
+                    return Boolean(id && name);
+                  })
+                  .map((category) => {
+                    const id = String(
+                      getOptionId(category)
+                    );
+
+                    const name =
+                      getOptionName(category);
+
+                    const categoryDescription =
+                      category.description ||
+                      (isOtherCategory(name)
+                        ? "For issues that do not fit another category."
+                        : "Select this category if it matches your issue.");
+
+                    const selected =
+                      String(categoryId) === id;
+
+                    return (
+                      <label
+                        key={id}
+                        className={`report-category-card ${
+                          selected ? "is-selected" : ""
+                        } ${
+                          isSubmitting || savedReportId
+                            ? "is-disabled"
+                            : ""
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="report-category"
+                          value={id}
+                          checked={selected}
+                          onChange={() =>
+                            setCategoryId(id)
+                          }
+                          disabled={
+                            isSubmitting ||
+                            Boolean(savedReportId)
+                          }
+                          required
+                        />
+
+                        <span
+                          className="report-category-card-icon"
+                          aria-hidden="true"
+                        >
+                          {getCategoryIcon(name)}
+                        </span>
+
+                        <span className="report-category-card-name">
+                          {name}
+                        </span>
+
+                        <span className="report-category-card-description">
+                          {categoryDescription}
+                        </span>
+
+                        <span
+                          className="report-category-card-check"
+                          aria-hidden="true"
+                        >
+                          {selected ? "✓" : ""}
+                        </span>
+                      </label>
+                    );
+                  })}
+              </div>
+            )}
+
+            {selectedCategoryIsOther && (
+              <div className="report-category-other-help">
+                <strong>
+                  Can't find your issue in the list?
+                </strong>
+
+                <p>
+                  No problem. Use this category and
+                  explain the problem clearly in the
+                  description above. The administrator
+                  can review it and introduce new
+                  categories later.
+                </p>
+              </div>
+            )}
+
+            <p className="report-form-hint">
+              Categories help residents and administrators
+              find similar community issues.
+            </p>
           </div>
 
+          {/* LOCATION SELECTION */}
+
           <div className="report-form-field">
-            <label htmlFor="location-mode">How would you like to choose the issue location?</label>
-            <select id="location-mode" value={locationMode} onChange={(e) => { setLocationMode(e.target.value); setCreatedPinId(null); }} disabled={isSubmitting || Boolean(savedReportId)}>
-              <option value="existing">Choose an existing location</option>
-              <option value="map">Pin the location on a map</option>
+            <label htmlFor="location-mode">
+              How would you like to choose the issue
+              location?
+            </label>
+
+            <select
+              id="location-mode"
+              value={locationMode}
+              onChange={(event) => {
+                setLocationMode(event.target.value);
+                setCreatedPinId(null);
+              }}
+              disabled={
+                isSubmitting || Boolean(savedReportId)
+              }
+            >
+              <option value="existing">
+                Choose an existing location
+              </option>
+
+              <option value="map">
+                Pin the location on a map
+              </option>
             </select>
+
             {locationMode === "existing" ? (
               <div className="report-form-select-wrap">
-                <select id="report-location" value={locationId} onChange={(e) => setLocationId(e.target.value)} required disabled={loadingOptions || isSubmitting || Boolean(savedReportId)}>
-                  <option value="">{loadingOptions ? "Loading locations..." : "Choose a location"}</option>
+                <select
+                  id="report-location"
+                  value={locationId}
+                  onChange={(event) =>
+                    setLocationId(event.target.value)
+                  }
+                  required
+                  disabled={
+                    loadingOptions ||
+                    isSubmitting ||
+                    Boolean(savedReportId)
+                  }
+                >
+                  <option value="">
+                    {loadingOptions
+                      ? "Loading locations..."
+                      : "Choose a location"}
+                  </option>
+
                   {locations.map((location) => {
                     const id = getOptionId(location);
                     const name = getOptionName(location);
-                    return id && name ? <option key={id} value={id}>{name}</option> : null;
+
+                    return id && name ? (
+                      <option
+                        key={id}
+                        value={id}
+                      >
+                        {name}
+                      </option>
+                    ) : null;
                   })}
                 </select>
               </div>
             ) : (
               <>
-                <label htmlFor="report-ward" style={{display:"block", marginTop:12}}>Ward</label>
-                <select id="report-ward" value={wardId} onChange={(e) => { setWardId(e.target.value); setCreatedPinId(null); }} required disabled={isSubmitting || Boolean(savedReportId)}>
-                  <option value="">Select the ward</option>
-                  {wards.map((ward) => <option key={ward.id} value={ward.id}>{ward.name ?? ward.wardName ?? ward.description ?? ward.id}</option>)}
+                <label
+                  htmlFor="report-ward"
+                  style={{
+                    display: "block",
+                    marginTop: 12,
+                  }}
+                >
+                  Ward
+                </label>
+
+                <select
+                  id="report-ward"
+                  value={wardId}
+                  onChange={(event) => {
+                    setWardId(event.target.value);
+                    setCreatedPinId(null);
+                  }}
+                  required
+                  disabled={
+                    isSubmitting ||
+                    Boolean(savedReportId)
+                  }
+                >
+                  <option value="">
+                    Select the ward
+                  </option>
+
+                  {wards.map((ward) => (
+                    <option
+                      key={ward.id}
+                      value={ward.id}
+                    >
+                      {ward.name ??
+                        ward.wardName ??
+                        ward.description ??
+                        ward.id}
+                    </option>
+                  ))}
                 </select>
-                {wards.length === 0 && <p className="report-form-hint">No wards loaded. Confirm your API exposes GET /api/Ward.</p>}
-                <LocationPicker point={mapPoint} onChange={(point) => { setMapPoint(point); setCreatedPinId(null); }} disabled={isSubmitting || Boolean(savedReportId)} />
-                <label htmlFor="pin-description" style={{display:"block", marginTop:12}}>Nearby landmark (optional)</label>
-                <input id="pin-description" value={locationDescription} onChange={(e) => { setLocationDescription(e.target.value); setCreatedPinId(null); }} maxLength={500} placeholder="e.g. Near the market entrance" disabled={isSubmitting || Boolean(savedReportId)} />
-                <p className="report-form-hint">Select the correct ward manually. The map pin does not verify ward boundaries.</p>
+
+                {wards.length === 0 && (
+                  <p className="report-form-hint">
+                    No wards loaded. Confirm your API
+                    exposes GET /api/Ward.
+                  </p>
+                )}
+
+                <LocationPicker
+                  point={mapPoint}
+                  onChange={(point) => {
+                    setMapPoint(point);
+                    setCreatedPinId(null);
+                  }}
+                  disabled={
+                    isSubmitting ||
+                    Boolean(savedReportId)
+                  }
+                />
+
+                <label
+                  htmlFor="pin-description"
+                  style={{
+                    display: "block",
+                    marginTop: 12,
+                  }}
+                >
+                  Nearby landmark (optional)
+                </label>
+
+                <input
+                  id="pin-description"
+                  value={locationDescription}
+                  onChange={(event) => {
+                    setLocationDescription(
+                      event.target.value
+                    );
+                    setCreatedPinId(null);
+                  }}
+                  maxLength={500}
+                  placeholder="e.g. Near the market entrance"
+                  disabled={
+                    isSubmitting ||
+                    Boolean(savedReportId)
+                  }
+                />
+
+                <p className="report-form-hint">
+                  Select the correct ward manually.
+                  The backend checks whether the pin
+                  falls within the permitted ward boundary.
+                </p>
               </>
             )}
           </div>
+
+          {/* PHOTO UPLOAD */}
 
           <PhotoUploader
             photos={photos}
@@ -397,23 +766,42 @@ function ReportForm({ onReportCreated, onCancel }) {
             disabled={isSubmitting}
           />
 
+          {/* ERRORS */}
+
           {submitError && (
-            <div className="report-form-error" role="alert">
+            <div
+              className="report-form-error"
+              role="alert"
+            >
               <span aria-hidden="true">!</span>
               <p>{submitError}</p>
             </div>
           )}
 
+          {/* SUBMIT */}
+
           <button
             className="report-form-submit"
             type="submit"
-            disabled={isSubmitting || loadingOptions || Boolean(optionsError)}
+            disabled={
+              isSubmitting ||
+              loadingOptions ||
+              Boolean(optionsError)
+            }
           >
             <span>
-              {isSubmitting ? "Saving report and photos..." : savedReportId ? "Retry remaining photos" : "Submit community report"}
+              {isSubmitting
+                ? "Saving report and photos..."
+                : savedReportId
+                  ? "Retry remaining photos"
+                  : "Submit community report"}
             </span>
+
             {!isSubmitting && (
-              <span className="report-form-submit-arrow" aria-hidden="true">
+              <span
+                className="report-form-submit-arrow"
+                aria-hidden="true"
+              >
                 →
               </span>
             )}
@@ -421,8 +809,9 @@ function ReportForm({ onReportCreated, onCancel }) {
 
           <p className="report-form-note">
             <span aria-hidden="true">◆</span>
-            Your report will be recorded under your account and shared through
-            the community reporting platform.
+            Your report will be recorded under your
+            account and shared through the community
+            reporting platform.
           </p>
         </form>
       </div>

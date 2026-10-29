@@ -2809,3 +2809,176 @@
     border-radius: 10px;
   }
 }
+
+/* ========================================
+   RESIDENT CATEGORY SELECTION CARDS
+======================================== */
+
+.report-category-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.report-category-heading h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.15rem;
+  font-weight: 750;
+  color: #173d2d;
+}
+
+.report-category-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.report-category-required {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: #16835d;
+  background: #eaf7ef;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.report-category-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.report-category-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 1.1rem;
+  border: 2px solid #e2e8e4;
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+
+.report-category-card:hover {
+  border-color: #16835d;
+  background: #f7fcf9;
+  transform: translateY(-2px);
+}
+
+.report-category-card.is-selected {
+  border-color: #16835d;
+  background: #eef8f2;
+  box-shadow: 0 4px 16px rgba(22, 131, 93, 0.1);
+}
+
+.report-category-card:focus-within {
+  outline: 2px solid #16835d;
+  outline-offset: 2px;
+}
+
+.report-category-card.is-disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.report-category-card input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  margin: 0;
+}
+
+.report-category-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #eef5f0;
+  font-size: 1.45rem;
+}
+
+.report-category-card.is-selected
+.report-category-card-icon {
+  background: #d7f0df;
+}
+
+.report-category-card-name {
+  padding-right: 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 750;
+  color: #173d2d;
+}
+
+.report-category-card-description {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+
+.report-category-card-check {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  color: transparent;
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.report-category-card.is-selected
+.report-category-card-check {
+  background: #16835d;
+  border-color: #16835d;
+  color: #fff;
+}
+
+.report-category-other-help {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-left: 4px solid #16835d;
+  border-radius: 10px;
+  background: #eef8f2;
+}
+
+.report-category-other-help strong {
+  color: #173d2d;
+}
+
+.report-category-other-help p {
+  margin: 0.5rem 0 0;
+  color: #475569;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 650px) {
+  .report-category-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-category-heading {
+    flex-direction: column;
+  }
+}
