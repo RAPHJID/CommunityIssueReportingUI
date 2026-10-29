@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from "react";
 import {
   MapContainer,
@@ -22,17 +23,12 @@ const STATUS_COLORS = {
   Resolved: "#16a34a",
   Rejected: "#dc2626",
   Duplicate: "#94a3b8",
+  "Out of Jurisdiction": "#78716c",
 };
 
 const STATUS_FILTERS = [
   "All Reports",
-  "Submitted",
-  "Under Review",
-  "Acknowledged",
-  "In Progress",
-  "Resolved",
-  "Rejected",
-  "Duplicate",
+  ...Object.keys(STATUS_COLORS),
 ];
 
 function createStatusIcon(status) {
@@ -52,16 +48,6 @@ function createStatusIcon(status) {
     iconAnchor: [16, 40],
     popupAnchor: [0, -35],
   });
-}
-
-function isInsideWard(latitude, longitude, boundary) {
-  if (!boundary) return false;
-
-  const point = L.latLng(latitude, longitude);
-  const layer = L.geoJSON(boundary);
-  const bounds = layer.getBounds();
-
-  return bounds.isValid() && bounds.contains(point);
 }
 
 function MapBounds({ boundary }) {
@@ -89,6 +75,19 @@ function MapBounds({ boundary }) {
   return null;
 }
 
+// Preliminary bounding-box check.
+// The backend remains responsible for exact ward validation.
+function isInsideWardBounds(latitude, longitude, boundary) {
+  if (!boundary) return true;
+
+  const bounds = L.geoJSON(boundary).getBounds();
+
+  return (
+    bounds.isValid() &&
+    bounds.contains([latitude, longitude])
+  );
+}
+
 export default function CommunityIssuesMap({
   reports = [],
   getStatusLabel,
@@ -96,54 +95,73 @@ export default function CommunityIssuesMap({
   onOpenReport,
 }) {
   const [locations, setLocations] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [boundary, setBoundary] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [categoryError, setCategoryError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
 
   const [selectedStatus, setSelectedStatus] =
     useState("All Reports");
-
+  const [selectedCategory, setSelectedCategory] =
+    useState("all");
   const [search, setSearch] = useState("");
 
   // ==========================================
-  // LOAD SAVED REPORT LOCATIONS
+  // LOAD LOCATIONS AND CATEGORIES
   // ==========================================
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadLocations() {
+    async function loadData() {
       setLoading(true);
       setError("");
+      setCategoryError("");
 
-      try {
-        const data = await apiRequest("/Location");
+      const [locationResult, categoryResult] =
+        await Promise.allSettled([
+          apiRequest("/Location"),
+          apiRequest("/Category"),
+        ]);
 
-        if (!Array.isArray(data)) {
-          throw new Error(
-            "The server returned an invalid locations response."
-          );
-        }
+      if (cancelled) return;
 
-        if (!cancelled) {
-          setLocations(data);
+      if (locationResult.status === "fulfilled") {
+        if (Array.isArray(locationResult.value)) {
+          setLocations(locationResult.value);
+        } else {
+          setLocations([]);
+          setError("Invalid locations response.");
         }
-      } catch (err) {
-        if (!cancelled) {
-          setError(
-            err.message || "Unable to load map locations."
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      } else {
+        setLocations([]);
+        setError(
+          locationResult.reason?.message ||
+            "Unable to load map locations."
+        );
       }
+
+      if (categoryResult.status === "fulfilled") {
+        if (Array.isArray(categoryResult.value)) {
+          setCategories(categoryResult.value);
+        } else {
+          setCategories([]);
+          setCategoryError("Invalid categories response.");
+        }
+      } else {
+        setCategories([]);
+        setCategoryError(
+          "Categories could not be loaded. Please retry."
+        );
+      }
+
+      setLoading(false);
     }
 
-    loadLocations();
+    loadData();
 
     return () => {
       cancelled = true;
@@ -160,7 +178,7 @@ export default function CommunityIssuesMap({
     async function loadBoundary() {
       try {
         const response = await fetch(
-          "/ndenderu-ward.geojson"
+          `${import.meta.env.BASE_URL}ndenderu-ward.geojson`
         );
 
         if (!response.ok) {
@@ -174,7 +192,7 @@ export default function CommunityIssuesMap({
         }
       } catch (err) {
         console.warn(
-          "Could not load Ndenderu boundary:",
+          "Unable to load Ndenderu boundary:",
           err
         );
       }
@@ -188,15 +206,30 @@ export default function CommunityIssuesMap({
   }, []);
 
   // ==========================================
+  // CATEGORY LOOKUP
+  // ==========================================
+
+  const categoryLookup = useMemo(() => {
+    return new Map(
+      categories.map((category) => [
+        String(category.id).toLowerCase(),
+        category.name,
+      ])
+    );
+  }, [categories]);
+
+  // ==========================================
   // MATCH REPORTS WITH SAVED LOCATIONS
   // ==========================================
 
   const mappedReports = useMemo(() => {
     const locationLookup = new Map(
-      locations.map((location) => [
-        String(location.id).toLowerCase(),
-        location,
-      ])
+      locations
+        .filter((location) => location?.id)
+        .map((location) => [
+          String(location.id).toLowerCase(),
+          location,
+        ])
     );
 
     return reports
@@ -209,8 +242,6 @@ export default function CommunityIssuesMap({
 
         const latitude = Number(location.latitude);
         const longitude = Number(location.longitude);
-
-
 
         if (
           location.latitude == null ||
@@ -226,17 +257,24 @@ export default function CommunityIssuesMap({
         }
 
         if (
-  boundary &&
-  !isInsideWard(latitude, longitude, boundary)
-) {
-  return null;
-}
+          !isInsideWardBounds(
+            latitude,
+            longitude,
+            boundary
+          )
+        ) {
+          return null;
+        }
 
         return {
           ...report,
           latitude,
           longitude,
           status: getStatusLabel(report.currentStatus),
+          categoryName:
+            categoryLookup.get(
+              String(report.categoryId || "").toLowerCase()
+            ) || "Uncategorized",
           locationName:
             location.description ||
             location.name ||
@@ -245,10 +283,16 @@ export default function CommunityIssuesMap({
         };
       })
       .filter(Boolean);
-  }, [reports, locations, getStatusLabel, boundary]);
+  }, [
+    reports,
+    locations,
+    boundary,
+    getStatusLabel,
+    categoryLookup,
+  ]);
 
   // ==========================================
-  // SEARCH AND STATUS FILTERS
+  // FILTER BY STATUS, CATEGORY, AND SEARCH
   // ==========================================
 
   const visibleReports = useMemo(() => {
@@ -259,21 +303,37 @@ export default function CommunityIssuesMap({
         selectedStatus === "All Reports" ||
         report.status === selectedStatus;
 
+      const matchesCategory =
+        selectedCategory === "all" ||
+        String(report.categoryId || "").toLowerCase() ===
+          selectedCategory.toLowerCase();
+
       const searchableText = [
         report.title,
         report.description,
         report.locationName,
+        report.categoryName,
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
-      const matchesSearch =
-        !query || searchableText.includes(query);
-
-      return matchesStatus && matchesSearch;
+      return (
+        matchesStatus &&
+        matchesCategory &&
+        (!query || searchableText.includes(query))
+      );
     });
-  }, [mappedReports, selectedStatus, search, boundary]);
+  }, [
+    mappedReports,
+    selectedStatus,
+    selectedCategory,
+    search,
+  ]);
+
+  // ==========================================
+  // MAP STATISTICS
+  // ==========================================
 
   const totalResolved = mappedReports.filter(
     (report) => report.status === "Resolved"
@@ -281,16 +341,68 @@ export default function CommunityIssuesMap({
 
   const totalActive = mappedReports.filter(
     (report) =>
-      !["Resolved", "Rejected", "Duplicate"].includes(
-        report.status
-      )
+      ![
+        "Resolved",
+        "Rejected",
+        "Duplicate",
+        "Out of Jurisdiction",
+      ].includes(report.status)
   ).length;
+
+  // ==========================================
+  // CATEGORY BREAKDOWN
+  // ==========================================
+
+  const categoryStats = useMemo(() => {
+    const stats = categories.map((category) => ({
+      id: String(category.id),
+      name: category.name,
+      count: mappedReports.filter(
+        (report) =>
+          String(report.categoryId || "").toLowerCase() ===
+          String(category.id).toLowerCase()
+      ).length,
+    }));
+
+    const uncategorizedCount = mappedReports.filter(
+      (report) =>
+        !categoryLookup.has(
+          String(report.categoryId || "").toLowerCase()
+        )
+    ).length;
+
+    if (uncategorizedCount > 0) {
+      stats.push({
+        id: "uncategorized",
+        name: "Uncategorized",
+        count: uncategorizedCount,
+      });
+    }
+
+    return stats
+      .filter((category) => category.count > 0)
+      .sort((a, b) => b.count - a.count);
+  }, [categories, mappedReports, categoryLookup]);
+
+  function selectCategory(categoryId) {
+    setSelectedCategory((current) =>
+      current === categoryId ? "all" : categoryId
+    );
+  }
+
+  function resetFilters() {
+    setSearch("");
+    setSelectedStatus("All Reports");
+    setSelectedCategory("all");
+  }
 
   return (
     <section
       className="community-map-section"
       aria-labelledby="community-map-title"
     >
+      {/* HEADER */}
+
       <div className="community-map-heading">
         <div>
           <span className="community-map-eyebrow">
@@ -302,8 +414,8 @@ export default function CommunityIssuesMap({
           </h2>
 
           <p>
-            Discover reported problems across Ndenderu Ward
-            and follow the progress being made.
+            Discover reported problems across Ndenderu Ward,
+            explore issue categories, and follow their progress.
           </p>
         </div>
       </div>
@@ -327,12 +439,11 @@ export default function CommunityIssuesMap({
         </div>
       </div>
 
-      {/* CONTROLS */}
+      {/* FILTERS */}
 
       <div className="community-map-controls">
         <label>
           Search issues
-
           <input
             type="search"
             placeholder="Search roads, water, garbage..."
@@ -345,7 +456,6 @@ export default function CommunityIssuesMap({
 
         <label>
           Filter by status
-
           <select
             value={selectedStatus}
             onChange={(event) =>
@@ -359,16 +469,69 @@ export default function CommunityIssuesMap({
             ))}
           </select>
         </label>
+
+        <label>
+          Filter by category
+          <select
+            value={selectedCategory}
+            onChange={(event) =>
+              setSelectedCategory(event.target.value)
+            }
+          >
+            <option value="all">All Categories</option>
+
+            {categories.map((category) => (
+              <option
+                key={category.id}
+                value={String(category.id)}
+              >
+                {category.name}
+              </option>
+            ))}
+
+            {categoryStats.some(
+              (category) =>
+                category.id === "uncategorized"
+            ) && (
+              <option value="uncategorized">
+                Uncategorized
+              </option>
+            )}
+          </select>
+        </label>
+      </div>
+
+      <div className="community-map-filter-actions">
+        <span>
+          {visibleReports.length} matching{" "}
+          {visibleReports.length === 1
+            ? "report"
+            : "reports"}
+        </span>
+
+        <button
+          type="button"
+          onClick={resetFilters}
+          className="community-map-reset"
+        >
+          Clear filters
+        </button>
       </div>
 
       {/* MAP */}
 
       {loading ? (
-        <div className="community-map-message" role="status">
-          Loading community issue locations...
+        <div
+          className="community-map-message"
+          role="status"
+        >
+          Loading community issues...
         </div>
       ) : error ? (
-        <div className="community-map-message" role="alert">
+        <div
+          className="community-map-message"
+          role="alert"
+        >
           <p>{error}</p>
 
           <button
@@ -436,17 +599,23 @@ export default function CommunityIssuesMap({
                       <p>
                         {report.description
                           ? report.description.length > 120
-                            ? `${report.description.slice(0, 120)}...`
+                            ? `${report.description.slice(
+                                0,
+                                120
+                              )}...`
                             : report.description
                           : "No description provided."}
                       </p>
 
                       <small>
-                        {report.locationName}
+                        Category: {report.categoryName}
                       </small>
 
+                      <small>{report.locationName}</small>
+
                       <small>
-                        Reported {formatDate(report.createdAt)}
+                        Reported{" "}
+                        {formatDate(report.createdAt)}
                       </small>
 
                       <button
@@ -466,9 +635,12 @@ export default function CommunityIssuesMap({
             </MapContainer>
           </div>
 
+          {/* MAP FOOTER */}
+
           <div className="community-map-footer">
             <p>
-              Showing <strong>{visibleReports.length}</strong>{" "}
+              Showing{" "}
+              <strong>{visibleReports.length}</strong>{" "}
               of <strong>{mappedReports.length}</strong>{" "}
               mapped reports
             </p>
@@ -491,27 +663,114 @@ export default function CommunityIssuesMap({
 
           {mappedReports.length === 0 && (
             <p className="community-map-note">
-              No reports with valid saved coordinates are
-              available to display yet.
+              No reports with valid mapped locations are
+              available yet.
             </p>
           )}
 
           {mappedReports.length > 0 &&
             visibleReports.length === 0 && (
               <p className="community-map-note">
-                No mapped issues match your current filters.
+                No issues match your current filters.
               </p>
             )}
 
           {reports.length > mappedReports.length && (
             <p className="community-map-note">
-              Some reports are not shown because their
-              saved locations could not be matched to
-              valid coordinates.
+              Some reports are not displayed because their
+              saved locations are missing, invalid, or
+              outside the ward's preliminary map bounds.
             </p>
           )}
         </>
       )}
+
+      {/* CATEGORY BREAKDOWN */}
+
+      <div className="community-category-breakdown">
+        <div className="community-category-heading">
+          <h3>Community issues by category</h3>
+          <p>
+            Discover the most frequently reported types of
+            community problems. Select a category to filter
+            the map.
+          </p>
+        </div>
+
+        {categoryError && (
+          <div
+            className="community-category-warning"
+            role="alert"
+          >
+            <span>{categoryError}</span>
+
+            <button
+              type="button"
+              onClick={() =>
+                setRetryKey((value) => value + 1)
+              }
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="muted">
+            Loading category statistics...
+          </p>
+        ) : categoryStats.length === 0 ? (
+          <p className="muted">
+            No categorized mapped reports are available yet.
+          </p>
+        ) : (
+          <div className="community-category-list">
+            {categoryStats.map((category) => {
+              const percentage =
+                mappedReports.length > 0
+                  ? (category.count /
+                      mappedReports.length) *
+                    100
+                  : 0;
+
+              const isActive =
+                selectedCategory === category.id;
+
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={`community-category-item ${
+                    isActive ? "is-active" : ""
+                  }`}
+                  onClick={() =>
+                    selectCategory(category.id)
+                  }
+                  aria-pressed={isActive}
+                >
+                  <div className="community-category-item-top">
+                    <span>{category.name}</span>
+                    <strong>{category.count}</strong>
+                  </div>
+
+                  <div className="community-category-track">
+                    <div
+                      className="community-category-progress"
+                      style={{
+                        width: `${percentage}%`,
+                      }}
+                    />
+                  </div>
+
+                  <span className="community-category-percentage">
+                    {percentage.toFixed(1)}% of mapped reports
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
