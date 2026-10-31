@@ -548,9 +548,13 @@ async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
               </button>
             ) : (
               <ReportForm
-                onCancel={() => setShowReportForm(false)}
-                onReportCreated={loadReports}
-              />
+  onCancel={() => setShowReportForm(false)}
+  onReportCreated={loadReports}
+  onViewReport={(reportId) => {
+    setShowReportForm(false);
+    handleSelectReport(reportId);
+  }}
+/>
             )}
           </section>
         )}

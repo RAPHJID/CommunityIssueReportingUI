@@ -3301,3 +3301,38 @@
     transition: none;
   }
 }
+/* ======================================
+   REPORT SUCCESS - SECONDARY BUTTON
+   ====================================== */
+
+.report-feedback-secondary {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 10px;
+  padding: 12px 20px;
+
+  background: transparent;
+  color: #456454;
+  border: 1px solid #d6e5da;
+  border-radius: 12px;
+
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.report-feedback-secondary:hover {
+  background: #f0f7f2;
+  border-color: #9fc5ad;
+}
+
+.report-feedback-secondary:focus-visible {
+  outline: 3px solid #16835d;
+  outline-offset: 3px;
+}

@@ -40,6 +40,7 @@ function getCategoryIcon(name) {
 export default function ReportForm({
   onReportCreated,
   onCancel,
+  onViewReport,
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -61,6 +62,7 @@ export default function ReportForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [submissionModal, setSubmissionModal] = useState(null);
+  const [completedReportId, setCompletedReportId] = useState(null);
 
   const selectedCategory = categories.find(
     (category) =>
@@ -91,6 +93,17 @@ export default function ReportForm({
 
   function closeModal() {
     setSubmissionModal(null);
+  }
+
+  function handleViewReport() {
+    if (!completedReportId || !onViewReport) {
+      return;
+    }
+
+    const reportId = completedReportId;
+
+    closeModal();
+    onViewReport(reportId);
   }
 
   // LOAD CATEGORIES AND AUTOMATIC NDENDERU WARD
@@ -315,6 +328,8 @@ export default function ReportForm({
         // Everything succeeded.
         // Reset form for another report.
 
+        setCompletedReportId(reportId);
+
         setSavedReportId(null);
         setCreatedPinId(null);
         setTitle("");
@@ -415,13 +430,35 @@ export default function ReportForm({
               {submissionModal.message}
             </p>
 
+            {/* VIEW MY REPORT BUTTON */}
+
+            {submissionModal.type === "success" &&
+              completedReportId &&
+              onViewReport && (
+                <button
+                  type="button"
+                  className="report-feedback-action"
+                  onClick={handleViewReport}
+                >
+                  View My Report →
+                </button>
+              )}
+
+            {/* SECONDARY ACTION */}
+
             <button
               type="button"
-              className="report-feedback-action"
+              className={
+                submissionModal.type === "success" &&
+                completedReportId &&
+                onViewReport
+                  ? "report-feedback-secondary"
+                  : "report-feedback-action"
+              }
               onClick={closeModal}
             >
               {submissionModal.type === "success"
-                ? "Awesome, thank you!"
+                ? "Done for now"
                 : submissionModal.type === "warning"
                   ? "Review and retry"
                   : "Try again"}
