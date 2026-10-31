@@ -2982,3 +2982,322 @@
     flex-direction: column;
   }
 }
+
+/* ==========================================
+   REPORT SUBMISSION FEEDBACK MODAL
+   ========================================== */
+
+/* Full screen overlay */
+
+.report-feedback-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+  background: rgba(10, 29, 20, 0.68);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+
+  animation: reportOverlayFade 0.25s ease-out;
+}
+
+/* Main popup card */
+
+.report-feedback-dialog {
+  position: relative;
+
+  width: 100%;
+  max-width: 440px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+
+  padding: 40px 34px 34px;
+
+  background: #ffffff;
+  color: #1c3528;
+  border-radius: 24px;
+
+  text-align: center;
+
+  box-shadow:
+    0 25px 80px rgba(0, 0, 0, 0.24),
+    0 4px 20px rgba(0, 0, 0, 0.08);
+
+  animation: reportDialogPop 0.4s
+    cubic-bezier(0.2, 1.2, 0.3, 1);
+}
+
+/* Close button */
+
+.report-feedback-close {
+  position: absolute;
+  top: 16px;
+  right: 17px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 34px;
+  height: 34px;
+
+  background: #f1f5f2;
+  color: #64746b;
+
+  border: none;
+  border-radius: 50%;
+
+  font-size: 1.5rem;
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.report-feedback-close:hover {
+  background: #e2ebe5;
+  transform: rotate(90deg);
+}
+
+/* Large status icon */
+
+.report-feedback-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 82px;
+  height: 82px;
+  margin: 0 auto 22px;
+
+  border-radius: 50%;
+
+  font-size: 2.6rem;
+  font-weight: 800;
+
+  animation: reportIconAppear 0.5s ease-out 0.15s both;
+}
+
+/* Success */
+
+.report-feedback-success .report-feedback-icon {
+  background: #e5f8eb;
+  color: #16835d;
+  box-shadow: 0 0 0 9px rgba(22, 131, 93, 0.07);
+}
+
+/* Error */
+
+.report-feedback-error .report-feedback-icon {
+  background: #feeceb;
+  color: #dc2626;
+  box-shadow: 0 0 0 9px rgba(220, 38, 38, 0.06);
+}
+
+/* Partial success / warning */
+
+.report-feedback-warning .report-feedback-icon {
+  background: #fff4dc;
+  color: #d97706;
+  box-shadow: 0 0 0 9px rgba(217, 119, 6, 0.06);
+}
+
+/* Small brand label */
+
+.report-feedback-eyebrow {
+  display: block;
+
+  margin-bottom: 12px;
+
+  color: #16835d;
+
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* Title */
+
+.report-feedback-dialog h2 {
+  margin: 0 0 14px;
+
+  color: #183d2c;
+
+  font-size: clamp(1.45rem, 4vw, 1.9rem);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.6px;
+}
+
+/* Description */
+
+.report-feedback-dialog p {
+  margin: 0 auto 28px;
+  max-width: 350px;
+
+  color: #66796c;
+
+  font-size: 0.95rem;
+  line-height: 1.75;
+}
+
+/* Action button */
+
+.report-feedback-action {
+  display: block;
+
+  width: 100%;
+  min-height: 50px;
+
+  padding: 14px 20px;
+
+  background: #16835d;
+  color: #ffffff;
+
+  border: none;
+  border-radius: 12px;
+
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 750;
+
+  cursor: pointer;
+
+  box-shadow: 0 6px 16px rgba(22, 131, 93, 0.2);
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.report-feedback-action:hover {
+  background: #116c4c;
+  transform: translateY(-2px);
+
+  box-shadow: 0 9px 20px rgba(22, 131, 93, 0.25);
+}
+
+.report-feedback-action:active {
+  transform: translateY(0);
+}
+
+/* Error action button */
+
+.report-feedback-error .report-feedback-action {
+  background: #dc2626;
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.18);
+}
+
+.report-feedback-error .report-feedback-action:hover {
+  background: #b91c1c;
+}
+
+/* Warning action button */
+
+.report-feedback-warning .report-feedback-action {
+  background: #d97706;
+  box-shadow: 0 6px 16px rgba(217, 119, 6, 0.18);
+}
+
+.report-feedback-warning .report-feedback-action:hover {
+  background: #b45309;
+}
+
+/* Keyboard accessibility */
+
+.report-feedback-close:focus-visible,
+.report-feedback-action:focus-visible {
+  outline: 3px solid #16835d;
+  outline-offset: 3px;
+}
+
+/* ==========================================
+   POPUP ANIMATIONS
+   ========================================== */
+
+@keyframes reportOverlayFade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes reportDialogPop {
+  from {
+    opacity: 0;
+    transform: translateY(25px) scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes reportIconAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotate(-15deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+/* ==========================================
+   MOBILE RESPONSIVENESS
+   ========================================== */
+
+@media (max-width: 600px) {
+  .report-feedback-overlay {
+    padding: 16px;
+  }
+
+  .report-feedback-dialog {
+    padding: 34px 22px 26px;
+    border-radius: 20px;
+  }
+
+  .report-feedback-icon {
+    width: 72px;
+    height: 72px;
+    font-size: 2.3rem;
+  }
+
+  .report-feedback-dialog p {
+    font-size: 0.9rem;
+    line-height: 1.65;
+  }
+
+  .report-feedback-action {
+    min-height: 48px;
+  }
+}
+
+/* Reduced motion accessibility */
+
+@media (prefers-reduced-motion: reduce) {
+  .report-feedback-overlay,
+  .report-feedback-dialog,
+  .report-feedback-icon {
+    animation: none;
+  }
+
+  .report-feedback-action,
+  .report-feedback-close {
+    transition: none;
+  }
+}

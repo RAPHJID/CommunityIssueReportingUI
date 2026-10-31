@@ -21,3 +21,155 @@
 .civic-area-results button { width: 100%; text-align: left; background: #fff; color: #20382b; border-color: #d9e5da; overflow-wrap: anywhere; }
 .civic-area-search .civic-location-error { padding: 10px 0 0; }
 @media(max-width:600px) { .civic-area-search form { flex-direction: column; } }
+/* ==========================================
+   NDENDERU LOCATION PICKER - AREA SEARCH
+   ========================================== */
+
+.civic-area-search {
+  margin: 18px 0;
+  padding: 20px;
+  background: #f8fbf9;
+  border: 1px solid #dce9e0;
+  border-radius: 16px;
+}
+
+.civic-area-search label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #183d2c;
+}
+
+.civic-area-search-controls {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.civic-area-search-controls input {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 15px;
+  background: #ffffff;
+  color: #1f3328;
+  -webkit-text-fill-color: #1f3328;
+  color-scheme: light;
+  border: 1px solid #c9d9cf;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.civic-area-search-controls input::placeholder {
+  color: #7b8e82;
+  -webkit-text-fill-color: #7b8e82;
+  opacity: 1;
+}
+
+.civic-area-search-controls input:focus {
+  outline: none;
+  border-color: #16835d;
+  box-shadow: 0 0 0 3px rgba(22, 131, 93, 0.12);
+}
+
+.civic-area-search-controls button {
+  flex-shrink: 0;
+  padding: 12px 20px;
+  background: #16835d;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.civic-area-search-controls button:hover:not(:disabled) {
+  background: #116c4c;
+  transform: translateY(-1px);
+}
+
+.civic-area-search-controls button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.civic-area-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.civic-area-results button {
+  width: 100%;
+  padding: 13px 15px;
+  background: #ffffff;
+  color: #244333;
+  text-align: left;
+  border: 1px solid #e0e9e3;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.civic-area-results button:hover:not(:disabled) {
+  background: #eaf6ef;
+  border-color: #91c5a5;
+}
+
+.civic-area-results button:focus-visible {
+  outline: 2px solid #16835d;
+  outline-offset: 2px;
+}
+
+.civic-area-results button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Ensure errors are clearly visible */
+
+.civic-area-search .civic-location-error {
+  margin: 12px 0 0;
+  color: #b42318;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* Mobile */
+
+@media (max-width: 600px) {
+  .civic-area-search {
+    padding: 15px;
+    border-radius: 12px;
+  }
+
+  .civic-area-search-controls {
+    flex-direction: column;
+  }
+
+  .civic-area-search-controls input,
+  .civic-area-search-controls button {
+    width: 100%;
+  }
+
+  .civic-area-search-controls button {
+    min-height: 44px;
+  }
+}
