@@ -7,3 +7,17 @@
 .civic-location-error { margin: 0; padding: 0 12px 12px; color: #a42626; }
 .civic-pin { font-size: 31px; line-height: 1; }
 @media (max-width: 600px) { .civic-location-map { height: 260px; } }
+
+
+/* Ndenderu area search: append to LocationPicker.css */
+.civic-area-search { padding: 12px; border-top: 1px solid #d9e5da; }
+.civic-area-search label { display: block; margin-bottom: 8px; color: #205f3b; font-weight: 600; }
+.civic-area-search form { display: flex; gap: 8px; }
+.civic-area-search input { flex: 1; min-width: 0; padding: 10px; border: 1px solid #b8cbbf; border-radius: 8px; background: #fff; color: #20382b; -webkit-text-fill-color: #20382b; color-scheme: light; font: inherit; }
+.civic-area-search input::placeholder { color: #64748b; -webkit-text-fill-color: #64748b; }
+.civic-area-search button { padding: 10px 14px; border: 1px solid #287347; border-radius: 8px; background: #287347; color: #fff; cursor: pointer; font: inherit; }
+.civic-area-search button:disabled { opacity: .55; cursor: not-allowed; }
+.civic-area-results { display: grid; gap: 6px; margin-top: 10px; }
+.civic-area-results button { width: 100%; text-align: left; background: #fff; color: #20382b; border-color: #d9e5da; overflow-wrap: anywhere; }
+.civic-area-search .civic-location-error { padding: 10px 0 0; }
+@media(max-width:600px) { .civic-area-search form { flex-direction: column; } }

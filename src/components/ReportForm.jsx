@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { apiRequest, uploadReportPhoto } from "../services/api";
 import PhotoUploader from "./PhotoUploader";
@@ -38,35 +37,63 @@ function getCategoryIcon(name) {
   return "📍";
 }
 
-function ReportForm({ onReportCreated, onCancel }) {
+export default function ReportForm({
+  onReportCreated,
+  onCancel,
+}) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [locationId, setLocationId] = useState("");
-  const [locationMode, setLocationMode] = useState("existing");
+
   const [mapPoint, setMapPoint] = useState(null);
   const [wardId, setWardId] = useState("");
-  const [wards, setWards] = useState([]);
-  const [locationDescription, setLocationDescription] = useState("");
+  const [locationDescription, setLocationDescription] =
+    useState("");
+
   const [createdPinId, setCreatedPinId] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [savedReportId, setSavedReportId] = useState(null);
 
   const [categories, setCategories] = useState([]);
-  const [locations, setLocations] = useState([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [optionsError, setOptionsError] = useState("");
   const [submitError, setSubmitError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [submissionModal, setSubmissionModal] = useState(null);
+
   const selectedCategory = categories.find(
-    (category) => String(getOptionId(category)) === String(categoryId)
+    (category) =>
+      String(getOptionId(category)) === String(categoryId)
   );
 
   const selectedCategoryIsOther = isOtherCategory(
     getOptionName(selectedCategory)
   );
+
+  function showModal(type, titleText, message) {
+    setSubmissionModal({
+      type,
+      title: titleText,
+      message,
+    });
+  }
+
+  function showSubmissionError(message) {
+    setSubmitError(message);
+
+    showModal(
+      "error",
+      "Something went wrong",
+      message
+    );
+  }
+
+  function closeModal() {
+    setSubmissionModal(null);
+  }
+
+  // LOAD CATEGORIES AND AUTOMATIC NDENDERU WARD
 
   useEffect(() => {
     let cancelled = false;
@@ -76,35 +103,43 @@ function ReportForm({ onReportCreated, onCancel }) {
       setOptionsError("");
 
       try {
-        const [categoryData, locationData] = await Promise.all([
+        const [categoryData, wardData] = await Promise.all([
           apiRequest("/Category"),
-          apiRequest("/Location"),
+          apiRequest("/Ward"),
         ]);
 
-        if (!Array.isArray(categoryData) || !Array.isArray(locationData)) {
+        if (!Array.isArray(categoryData)) {
+          throw new Error("Invalid categories response.");
+        }
+
+        if (!Array.isArray(wardData)) {
+          throw new Error("Invalid wards response.");
+        }
+
+        const ndenderu = wardData.filter((ward) =>
+          /^ndenderu(?:\s+ward)?$/i.test(
+            String(
+              ward.name ?? ward.wardName ?? ""
+            ).trim()
+          )
+        );
+
+        if (ndenderu.length !== 1 || !ndenderu[0].id) {
           throw new Error(
-            "The server returned an unexpected category or location response."
+            "Ndenderu Ward could not be identified. " +
+            "Please contact the administrator."
           );
         }
 
-        if (cancelled) return;
-
-        setCategories(categoryData);
-        setLocations(locationData);
-
-        try {
-          const wardData = await apiRequest("/Ward");
-
-          if (!cancelled && Array.isArray(wardData)) {
-            setWards(wardData);
-          }
-        } catch (wardError) {
-          console.error("Unable to load wards:", wardError);
+        if (!cancelled) {
+          setCategories(categoryData);
+          setWardId(String(ndenderu[0].id));
         }
-      } catch (err) {
+      } catch (error) {
         if (!cancelled) {
           setOptionsError(
-            err.message || "Unable to load categories and locations."
+            error.message ||
+            "Unable to load the report form."
           );
         }
       } finally {
@@ -121,20 +156,27 @@ function ReportForm({ onReportCreated, onCancel }) {
     };
   }, []);
 
+  // SUBMIT REPORT AND UPLOAD PHOTOS
+
   async function handleSubmit(event) {
     event.preventDefault();
 
     if (isSubmitting) return;
 
     setSubmitError("");
-    setSuccessMessage("");
+    setSubmissionModal(null);
 
     const cleanTitle = title.trim();
     const cleanDescription = description.trim();
 
     if (!savedReportId) {
-      if (cleanTitle.length < 5 || cleanTitle.length > 255) {
-        setSubmitError("The title must be between 5 and 255 characters.");
+      if (
+        cleanTitle.length < 5 ||
+        cleanTitle.length > 255
+      ) {
+        showSubmissionError(
+          "The report title must contain between 5 and 255 characters."
+        );
         return;
       }
 
@@ -142,28 +184,30 @@ function ReportForm({ onReportCreated, onCancel }) {
         cleanDescription.length < 10 ||
         cleanDescription.length > 2000
       ) {
-        setSubmitError(
-          "The description must be between 10 and 2,000 characters."
+        showSubmissionError(
+          "The description must contain between 10 and 2,000 characters."
         );
         return;
       }
 
       if (!categoryId) {
-        setSubmitError("Please choose an issue category.");
+        showSubmissionError(
+          "Please select the category that best describes your issue."
+        );
         return;
       }
 
-      if (locationMode === "existing" && !locationId) {
-        setSubmitError("Please choose an issue location.");
+      if (!wardId) {
+        showSubmissionError(
+          "Ndenderu Ward is not available. " +
+          "Please refresh the page and try again."
+        );
         return;
       }
 
-      if (
-        locationMode === "map" &&
-        (!mapPoint || !wardId)
-      ) {
-        setSubmitError(
-          "Please select a ward and a point on the map."
+      if (!mapPoint) {
+        showSubmissionError(
+          "Please select the exact issue location on the map."
         );
         return;
       }
@@ -175,48 +219,57 @@ function ReportForm({ onReportCreated, onCancel }) {
 
     try {
       if (!reportId) {
-        let finalLocationId = locationId;
+        let finalLocationId = createdPinId;
 
-        if (locationMode === "map") {
-          finalLocationId = createdPinId;
+        // Save selected map coordinates first.
 
-          if (!finalLocationId) {
-            const pin = await apiRequest("/Location/report-pin", {
+        if (!finalLocationId) {
+          const pin = await apiRequest(
+            "/Location/report-pin",
+            {
               method: "POST",
               body: JSON.stringify({
                 latitude: mapPoint.latitude,
                 longitude: mapPoint.longitude,
-                accuracyMeters: mapPoint.accuracyMeters,
+                accuracyMeters:
+                  mapPoint.accuracyMeters ?? null,
                 wardId,
                 areaId: null,
-                description: locationDescription.trim() || null,
+                description:
+                  locationDescription.trim() || null,
               }),
-            });
-
-            if (!pin?.id) {
-              throw new Error(
-                "Location was not saved. Please retry."
-              );
             }
+          );
 
-            finalLocationId = pin.id;
-            setCreatedPinId(pin.id);
+          if (!pin?.id) {
+            throw new Error(
+              "The selected location could not be saved. Please try again."
+            );
           }
+
+          finalLocationId = pin.id;
+          setCreatedPinId(pin.id);
         }
 
-        const createdReport = await apiRequest("/Report", {
-          method: "POST",
-          body: JSON.stringify({
-            title: cleanTitle,
-            description: cleanDescription,
-            categoryId,
-            locationId: finalLocationId,
-          }),
-        });
+        // Create the actual report.
+
+        const createdReport = await apiRequest(
+          "/Report",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              title: cleanTitle,
+              description: cleanDescription,
+              categoryId,
+              locationId: finalLocationId,
+            }),
+          }
+        );
 
         if (!createdReport?.id) {
           throw new Error(
-            "The server did not return a report ID. Check your reports before trying again."
+            "The server did not return a report ID. " +
+            "Please check your reports before submitting again."
           );
         }
 
@@ -224,42 +277,60 @@ function ReportForm({ onReportCreated, onCancel }) {
         setSavedReportId(reportId);
       }
 
+      // Upload photos one at a time.
+      // Keep only failed photos for retry.
+
       const failedPhotos = [];
 
       for (const photo of photos) {
         try {
           await uploadReportPhoto(reportId, photo);
         } catch (uploadError) {
-          console.error("Photo upload failed:", uploadError);
+          console.error(
+            "Photo upload failed:",
+            uploadError
+          );
+
           failedPhotos.push(photo);
         }
       }
 
-      if (failedPhotos.length) {
+      if (failedPhotos.length > 0) {
         setPhotos(failedPhotos);
 
-        setSubmitError(
-          `Report saved, but ${failedPhotos.length} photo(s) could not be confirmed as uploaded. You can retry the remaining photos, but check the report first to avoid duplicate images.`
-        );
+        const message =
+          `Your report was saved successfully, but ` +
+          `${failedPhotos.length} photo(s) could not be ` +
+          `confirmed as uploaded. Check the report first ` +
+          `to avoid duplicate images, then retry if needed.`;
 
-        setSuccessMessage(
-          "Your community report was created successfully."
+        setSubmitError(message);
+
+        showModal(
+          "warning",
+          "Report saved — photos need attention",
+          message
         );
       } else {
+        // Everything succeeded.
+        // Reset form for another report.
+
         setSavedReportId(null);
-        setPhotos([]);
+        setCreatedPinId(null);
         setTitle("");
         setDescription("");
         setCategoryId("");
-        setLocationId("");
-        setCreatedPinId(null);
         setMapPoint(null);
-        setWardId("");
         setLocationDescription("");
-        setLocationMode("existing");
+        setPhotos([]);
+        setSubmitError("");
 
-        setSuccessMessage(
-          "Your report and photos were submitted successfully."
+        showModal(
+          "success",
+          "Your voice has been heard!",
+          "Your community report has been submitted " +
+          "successfully. Thank you for helping make " +
+          "Ndenderu Ward a better place."
         );
       }
 
@@ -273,9 +344,10 @@ function ReportForm({ onReportCreated, onCancel }) {
           );
         }
       }
-    } catch (err) {
-      setSubmitError(
-        err.message || "Unable to submit your report."
+    } catch (error) {
+      showSubmissionError(
+        error.message ||
+        "Unable to submit your report. Please try again."
       );
     } finally {
       setIsSubmitting(false);
@@ -287,6 +359,79 @@ function ReportForm({ onReportCreated, onCancel }) {
       className="report-form-panel"
       aria-labelledby="report-form-title"
     >
+      {/* SUBMISSION FEEDBACK POPUP */}
+
+      {submissionModal && (
+        <div
+          className="report-feedback-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (
+              event.target === event.currentTarget
+            ) {
+              closeModal();
+            }
+          }}
+        >
+          <div
+            className={
+              `report-feedback-dialog ` +
+              `report-feedback-${submissionModal.type}`
+            }
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="report-feedback-title"
+            aria-describedby="report-feedback-message"
+          >
+            <button
+              type="button"
+              className="report-feedback-close"
+              aria-label="Close notification"
+              onClick={closeModal}
+            >
+              ×
+            </button>
+
+            <div
+              className="report-feedback-icon"
+              aria-hidden="true"
+            >
+              {submissionModal.type === "success"
+                ? "✓"
+                : submissionModal.type === "warning"
+                  ? "!"
+                  : "×"}
+            </div>
+
+            <span className="report-feedback-eyebrow">
+              NDENDERU COMMUNITY
+            </span>
+
+            <h2 id="report-feedback-title">
+              {submissionModal.title}
+            </h2>
+
+            <p id="report-feedback-message">
+              {submissionModal.message}
+            </p>
+
+            <button
+              type="button"
+              className="report-feedback-action"
+              onClick={closeModal}
+            >
+              {submissionModal.type === "success"
+                ? "Awesome, thank you!"
+                : submissionModal.type === "warning"
+                  ? "Review and retry"
+                  : "Try again"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* VISUAL SIDEBAR */}
+
       <div className="report-form-visual">
         <div
           className="report-form-brand"
@@ -307,9 +452,10 @@ function ReportForm({ onReportCreated, onCancel }) {
         </h2>
 
         <p className="report-form-visual-copy">
-          Every useful report starts with a clear description
-          and the right location. Help your community
-          understand what needs attention.
+          Every useful report starts with a clear
+          description and the right location.
+          Help your community understand what
+          needs attention.
         </p>
 
         <div
@@ -319,9 +465,11 @@ function ReportForm({ onReportCreated, onCancel }) {
           <div className="report-form-ring ring-one" />
           <div className="report-form-ring ring-two" />
           <div className="report-form-ring ring-three" />
+
           <div className="report-form-illustration-core">
             +
           </div>
+
           <span className="report-form-orbit-dot dot-one" />
           <span className="report-form-orbit-dot dot-two" />
           <span className="report-form-orbit-dot dot-three" />
@@ -332,6 +480,8 @@ function ReportForm({ onReportCreated, onCancel }) {
           A better community begins with being heard.
         </div>
       </div>
+
+      {/* FORM CONTENT */}
 
       <div className="report-form-content">
         <div className="report-form-topline">
@@ -359,20 +509,12 @@ function ReportForm({ onReportCreated, onCancel }) {
           </h2>
 
           <p>
-            Tell us what is happening and where the
-            community needs attention.
+            Tell us what is happening and where
+            the community needs attention.
           </p>
         </div>
 
-        {successMessage && (
-          <div
-            className="report-form-success"
-            role="status"
-          >
-            <span aria-hidden="true">✓</span>
-            <p>{successMessage}</p>
-          </div>
-        )}
+        {/* LOADING ERROR */}
 
         {optionsError && (
           <div
@@ -394,7 +536,7 @@ function ReportForm({ onReportCreated, onCancel }) {
           className="report-form-fields"
           onSubmit={handleSubmit}
         >
-          {/* REPORT TITLE */}
+          {/* TITLE */}
 
           <div className="report-form-field">
             <div className="report-form-label-row">
@@ -417,7 +559,8 @@ function ReportForm({ onReportCreated, onCancel }) {
               maxLength={255}
               required
               disabled={
-                isSubmitting || Boolean(savedReportId)
+                isSubmitting ||
+                Boolean(savedReportId)
               }
             />
 
@@ -443,13 +586,17 @@ function ReportForm({ onReportCreated, onCancel }) {
               onChange={(event) =>
                 setDescription(event.target.value)
               }
-              placeholder="Describe the problem, its impact, and any useful details..."
+              placeholder={
+                "Describe the problem, its impact, " +
+                "and any useful details..."
+              }
               minLength={10}
               maxLength={2000}
               rows={4}
               required
               disabled={
-                isSubmitting || Boolean(savedReportId)
+                isSubmitting ||
+                Boolean(savedReportId)
               }
             />
 
@@ -469,8 +616,8 @@ function ReportForm({ onReportCreated, onCancel }) {
                 </h3>
 
                 <p>
-                  Choose the category that best describes
-                  the problem.
+                  Choose the category that best
+                  describes the problem.
                 </p>
               </div>
 
@@ -525,13 +672,15 @@ function ReportForm({ onReportCreated, onCancel }) {
                     return (
                       <label
                         key={id}
-                        className={`report-category-card ${
-                          selected ? "is-selected" : ""
-                        } ${
-                          isSubmitting || savedReportId
-                            ? "is-disabled"
-                            : ""
-                        }`}
+                        className={
+                          `report-category-card ` +
+                          `${selected ? "is-selected" : ""} ` +
+                          `${
+                            isSubmitting || savedReportId
+                              ? "is-disabled"
+                              : ""
+                          }`
+                        }
                       >
                         <input
                           type="radio"
@@ -597,165 +746,68 @@ function ReportForm({ onReportCreated, onCancel }) {
             </p>
           </div>
 
-          {/* LOCATION SELECTION */}
+          {/* LOCATION PICKER */}
 
           <div className="report-form-field">
-            <label htmlFor="location-mode">
-              How would you like to choose the issue
-              location?
-            </label>
+            <h3>Choose the issue location</h3>
 
-            <select
-              id="location-mode"
-              value={locationMode}
-              onChange={(event) => {
-                setLocationMode(event.target.value);
+            <p className="report-form-hint">
+              Reporting is currently available only
+              inside Ndenderu Ward.
+              Use your GPS, search for an area,
+              or click the exact location on the map.
+            </p>
+
+            {!wardId && !loadingOptions && (
+              <p
+                className="report-form-error"
+                role="alert"
+              >
+                Ndenderu Ward could not be identified.
+                Please contact the administrator.
+              </p>
+            )}
+
+            <LocationPicker
+              point={mapPoint}
+              onChange={(nextPoint) => {
+                setMapPoint(nextPoint);
                 setCreatedPinId(null);
               }}
               disabled={
-                isSubmitting || Boolean(savedReportId)
+                isSubmitting ||
+                Boolean(savedReportId) ||
+                !wardId
               }
+            />
+
+            <label
+              htmlFor="pin-description"
+              style={{
+                display: "block",
+                marginTop: 12,
+              }}
             >
-              <option value="existing">
-                Choose an existing location
-              </option>
+              Nearby landmark (optional)
+            </label>
 
-              <option value="map">
-                Pin the location on a map
-              </option>
-            </select>
+            <input
+              id="pin-description"
+              value={locationDescription}
+              onChange={(event) => {
+                setLocationDescription(
+                  event.target.value
+                );
 
-            {locationMode === "existing" ? (
-              <div className="report-form-select-wrap">
-                <select
-                  id="report-location"
-                  value={locationId}
-                  onChange={(event) =>
-                    setLocationId(event.target.value)
-                  }
-                  required
-                  disabled={
-                    loadingOptions ||
-                    isSubmitting ||
-                    Boolean(savedReportId)
-                  }
-                >
-                  <option value="">
-                    {loadingOptions
-                      ? "Loading locations..."
-                      : "Choose a location"}
-                  </option>
-
-                  {locations.map((location) => {
-                    const id = getOptionId(location);
-                    const name = getOptionName(location);
-
-                    return id && name ? (
-                      <option
-                        key={id}
-                        value={id}
-                      >
-                        {name}
-                      </option>
-                    ) : null;
-                  })}
-                </select>
-              </div>
-            ) : (
-              <>
-                <label
-                  htmlFor="report-ward"
-                  style={{
-                    display: "block",
-                    marginTop: 12,
-                  }}
-                >
-                  Ward
-                </label>
-
-                <select
-                  id="report-ward"
-                  value={wardId}
-                  onChange={(event) => {
-                    setWardId(event.target.value);
-                    setCreatedPinId(null);
-                  }}
-                  required
-                  disabled={
-                    isSubmitting ||
-                    Boolean(savedReportId)
-                  }
-                >
-                  <option value="">
-                    Select the ward
-                  </option>
-
-                  {wards.map((ward) => (
-                    <option
-                      key={ward.id}
-                      value={ward.id}
-                    >
-                      {ward.name ??
-                        ward.wardName ??
-                        ward.description ??
-                        ward.id}
-                    </option>
-                  ))}
-                </select>
-
-                {wards.length === 0 && (
-                  <p className="report-form-hint">
-                    No wards loaded. Confirm your API
-                    exposes GET /api/Ward.
-                  </p>
-                )}
-
-                <LocationPicker
-                  point={mapPoint}
-                  onChange={(point) => {
-                    setMapPoint(point);
-                    setCreatedPinId(null);
-                  }}
-                  disabled={
-                    isSubmitting ||
-                    Boolean(savedReportId)
-                  }
-                />
-
-                <label
-                  htmlFor="pin-description"
-                  style={{
-                    display: "block",
-                    marginTop: 12,
-                  }}
-                >
-                  Nearby landmark (optional)
-                </label>
-
-                <input
-                  id="pin-description"
-                  value={locationDescription}
-                  onChange={(event) => {
-                    setLocationDescription(
-                      event.target.value
-                    );
-                    setCreatedPinId(null);
-                  }}
-                  maxLength={500}
-                  placeholder="e.g. Near the market entrance"
-                  disabled={
-                    isSubmitting ||
-                    Boolean(savedReportId)
-                  }
-                />
-
-                <p className="report-form-hint">
-                  Select the correct ward manually.
-                  The backend checks whether the pin
-                  falls within the permitted ward boundary.
-                </p>
-              </>
-            )}
+                setCreatedPinId(null);
+              }}
+              maxLength={500}
+              placeholder="e.g. Near the market entrance"
+              disabled={
+                isSubmitting ||
+                Boolean(savedReportId)
+              }
+            />
           </div>
 
           {/* PHOTO UPLOAD */}
@@ -766,7 +818,7 @@ function ReportForm({ onReportCreated, onCancel }) {
             disabled={isSubmitting}
           />
 
-          {/* ERRORS */}
+          {/* INLINE ERROR */}
 
           {submitError && (
             <div
@@ -778,7 +830,7 @@ function ReportForm({ onReportCreated, onCancel }) {
             </div>
           )}
 
-          {/* SUBMIT */}
+          {/* SUBMIT BUTTON */}
 
           <button
             className="report-form-submit"
@@ -809,14 +861,12 @@ function ReportForm({ onReportCreated, onCancel }) {
 
           <p className="report-form-note">
             <span aria-hidden="true">◆</span>
-            Your report will be recorded under your
-            account and shared through the community
-            reporting platform.
+            Your report will be recorded under
+            your account and shared through
+            the community reporting platform.
           </p>
         </form>
       </div>
     </section>
   );
 }
-
-export default ReportForm;
