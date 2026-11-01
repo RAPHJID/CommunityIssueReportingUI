@@ -96,17 +96,37 @@ function FlyToSearchedArea({ area }) {
   return null;
 }
 
+function ReturnToWard({ boundary, resetKey }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (resetKey === 0) return;
+
+    if (!boundary) {
+      map.flyTo(NDENDERU_CENTER, 14);
+      return;
+    }
+
+    const bounds = L.geoJSON(boundary).getBounds();
+
+    if (bounds.isValid()) {
+      map.flyToBounds(bounds, {
+        padding: [12, 12],
+        maxZoom: 16,
+        duration: 1.1,
+      });
+    }
+  }, [map, boundary, resetKey]);
+
+  return null;
+}
+
 // Preliminary bounding-box check.
 // The backend remains responsible for exact ward validation.
 function isInsideWardBounds(latitude, longitude, boundary) {
   if (!boundary) return true;
 
-  const bounds = L.geoJSON(boundary).getBounds();
-
-  return (
-    bounds.isValid() &&
-    bounds.contains([latitude, longitude])
-  );
+  return insideBoundary(latitude, longitude, boundary);
 }
 
 function pointOnSegment(x, y, ax, ay, bx, by) {
@@ -211,6 +231,7 @@ const [areaResults, setAreaResults] = useState([]);
 const [searchingArea, setSearchingArea] = useState(false);
 const [areaSearchError, setAreaSearchError] = useState("");
 const [focusedArea, setFocusedArea] = useState(null);
+const [wardResetKey, setWardResetKey] = useState(0);
 
   // ==========================================
   // LOAD LOCATIONS AND CATEGORIES
@@ -601,6 +622,13 @@ function selectSearchedArea(item) {
   setAreaSearchError("");
 }
 
+function returnToNdenderu() {
+  setFocusedArea(null);
+  setAreaQuery("");
+  setAreaResults([]);
+  setAreaSearchError("");
+  setWardResetKey((current) => current + 1);
+}
   return (
     <section
       className="community-map-section"
@@ -672,12 +700,21 @@ function selectSearchedArea(item) {
           />
 
           <button
-            type="button"
-            onClick={searchArea}
-            disabled={!boundary || searchingArea}
-          >
-            {searchingArea ? "Searching..." : "Find area"}
-          </button>
+  type="button"
+  onClick={searchArea}
+  disabled={!boundary || searchingArea}
+>
+  {searchingArea ? "Searching..." : "Find area"}
+</button>
+
+<button
+  type="button"
+  className="community-return-ward"
+  onClick={returnToNdenderu}
+  disabled={!boundary}
+>
+  Back to Ndenderu
+</button>
         </div>
 
         {areaSearchError && (
@@ -896,9 +933,12 @@ function selectSearchedArea(item) {
                   </Popup>
                 </Marker>
               ))}
-
-              <MapBounds boundary={boundary} />
-              <FlyToSearchedArea area={focusedArea} />
+<MapBounds boundary={boundary} />
+<FlyToSearchedArea area={focusedArea} />
+<ReturnToWard
+  boundary={boundary}
+  resetKey={wardResetKey}
+/>
             </MapContainer>
           </div>
 

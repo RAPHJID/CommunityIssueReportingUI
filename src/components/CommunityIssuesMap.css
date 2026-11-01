@@ -499,3 +499,15 @@
     width: 100%;
   }
 }
+
+/* BACK TO NDENDERU BUTTON */
+
+.community-area-search-controls .community-return-ward {
+  background: #ffffff;
+  color: #176344;
+  border: 1px solid #16835d;
+}
+
+.community-area-search-controls .community-return-ward:hover:not(:disabled) {
+  background: #eaf6ef;
+}
