@@ -55,21 +55,26 @@ function MapBounds({ boundary }) {
 
   useEffect(() => {
     if (!boundary) {
-      map.setView(NDENDERU_CENTER, 13);
+      map.setView(NDENDERU_CENTER, 14);
       return;
     }
 
     const layer = L.geoJSON(boundary);
     const bounds = layer.getBounds();
 
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, {
-        padding: [30, 30],
-        maxZoom: 14,
-      });
-    } else {
-      map.setView(NDENDERU_CENTER, 13);
+    if (!bounds.isValid()) {
+      map.setView(NDENDERU_CENTER, 14);
+      return;
     }
+
+    map.fitBounds(bounds, {
+      padding: [12, 12],
+      maxZoom: 16,
+      animate: true,
+    });
+
+    map.setMaxBounds(bounds.pad(0.15));
+    map.options.maxBoundsViscosity = 0.85;
   }, [map, boundary]);
 
   return null;
@@ -547,11 +552,13 @@ export default function CommunityIssuesMap({
         <>
           <div className="community-map-frame">
             <MapContainer
-              center={NDENDERU_CENTER}
-              zoom={13}
-              scrollWheelZoom={false}
-              className="community-map-leaflet"
-            >
+  center={NDENDERU_CENTER}
+  zoom={14}
+  minZoom={12}
+  maxZoom={19}
+  scrollWheelZoom={false}
+  className="community-map-leaflet"
+>
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
