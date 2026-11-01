@@ -402,3 +402,100 @@
     flex-direction: column;
   }
 }
+/* PUBLIC MAP AREA SEARCH */
+
+.community-area-search {
+  margin: 24px 0;
+  padding: 22px;
+  border: 1px solid #dce8e1;
+  border-radius: 16px;
+  background: #f8fcf9;
+}
+
+.community-area-search label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #174c35;
+}
+
+.community-area-search-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.community-area-search-controls input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #cadbd0;
+  border-radius: 10px;
+  background: white;
+  color: #173c2c;
+  font: inherit;
+}
+
+.community-area-search-controls input:focus {
+  outline: 2px solid #16835d;
+  outline-offset: 2px;
+}
+
+.community-area-search-controls button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 10px;
+  background: #16835d;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.community-area-search-controls button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.community-area-search-error {
+  margin: 12px 0 0;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.community-area-search-results {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.community-area-search-results button {
+  padding: 12px;
+  border: 1px solid #dce8e1;
+  border-radius: 9px;
+  background: white;
+  color: #174c35;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.community-area-search-results button:hover {
+  background: #eaf6ef;
+  border-color: #16835d;
+}
+
+@media (max-width: 600px) {
+  .community-area-search {
+    padding: 16px;
+  }
+
+  .community-area-search-controls {
+    flex-direction: column;
+  }
+
+  .community-area-search-controls button {
+    width: 100%;
+  }
+}

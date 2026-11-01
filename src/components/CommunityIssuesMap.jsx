@@ -80,6 +80,22 @@ function MapBounds({ boundary }) {
   return null;
 }
 
+function FlyToSearchedArea({ area }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!area) return;
+
+    map.flyTo(
+      [area.latitude, area.longitude],
+      16,
+      { duration: 1.1 }
+    );
+  }, [area, map]);
+
+  return null;
+}
+
 // Preliminary bounding-box check.
 // The backend remains responsible for exact ward validation.
 function isInsideWardBounds(latitude, longitude, boundary) {
@@ -91,6 +107,82 @@ function isInsideWardBounds(latitude, longitude, boundary) {
     bounds.isValid() &&
     bounds.contains([latitude, longitude])
   );
+}
+
+function pointOnSegment(x, y, ax, ay, bx, by) {
+  const cross = (x - ax) * (by - ay) - (y - ay) * (bx - ax);
+
+  if (Math.abs(cross) > 1e-9) return false;
+
+  return (
+    x >= Math.min(ax, bx) - 1e-9 &&
+    x <= Math.max(ax, bx) + 1e-9 &&
+    y >= Math.min(ay, by) - 1e-9 &&
+    y <= Math.max(ay, by) + 1e-9
+  );
+}
+
+function insideRing(x, y, ring) {
+  let inside = false;
+
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+
+    if (pointOnSegment(x, y, xi, yi, xj, yj)) {
+      return true;
+    }
+
+    if (
+      (yi > y) !== (yj > y) &&
+      x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
+    ) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+function insidePolygon(x, y, rings) {
+  if (!rings.length || !insideRing(x, y, rings[0])) {
+    return false;
+  }
+
+  return !rings.slice(1).some((hole) =>
+    insideRing(x, y, hole)
+  );
+}
+
+function insideBoundary(latitude, longitude, boundary) {
+  if (!boundary) return false;
+
+  const features =
+    boundary.type === "FeatureCollection"
+      ? boundary.features || []
+      : boundary.type === "Feature"
+        ? [boundary]
+        : [{ geometry: boundary }];
+
+  return features.some(({ geometry }) => {
+    if (!geometry) return false;
+
+    if (geometry.type === "Polygon") {
+      return insidePolygon(
+        longitude,
+        latitude,
+        geometry.coordinates
+      );
+    }
+
+    if (geometry.type === "MultiPolygon") {
+      return geometry.coordinates.some((polygon) =>
+        insidePolygon(longitude, latitude, polygon)
+      );
+    }
+
+    return false;
+  });
 }
 
 export default function CommunityIssuesMap({
@@ -113,6 +205,12 @@ export default function CommunityIssuesMap({
   const [selectedCategory, setSelectedCategory] =
     useState("all");
   const [search, setSearch] = useState("");
+
+  const [areaQuery, setAreaQuery] = useState("");
+const [areaResults, setAreaResults] = useState([]);
+const [searchingArea, setSearchingArea] = useState(false);
+const [areaSearchError, setAreaSearchError] = useState("");
+const [focusedArea, setFocusedArea] = useState(null);
 
   // ==========================================
   // LOAD LOCATIONS AND CATEGORIES
@@ -296,6 +394,7 @@ export default function CommunityIssuesMap({
     categoryLookup,
   ]);
 
+ 
   // ==========================================
   // FILTER BY STATUS, CATEGORY, AND SEARCH
   // ==========================================
@@ -401,6 +500,107 @@ export default function CommunityIssuesMap({
     setSelectedCategory("all");
   }
 
+  async function searchArea() {
+  if (searchingArea) return;
+
+  const query = areaQuery.trim();
+
+  if (!query) {
+    setAreaSearchError("Enter an area or landmark name.");
+    return;
+  }
+
+  if (!boundary) {
+    setAreaSearchError(
+      "Wait for the Ndenderu Ward boundary to load."
+    );
+    return;
+  }
+
+  setSearchingArea(true);
+  setAreaSearchError("");
+  setAreaResults([]);
+
+  try {
+    const bounds = L.geoJSON(boundary).getBounds();
+
+    const viewbox = [
+      bounds.getWest(),
+      bounds.getNorth(),
+      bounds.getEast(),
+      bounds.getSouth(),
+    ].join(",");
+
+    const params = new URLSearchParams({
+      q: query,
+      format: "jsonv2",
+      addressdetails: "1",
+      countrycodes: "ke",
+      viewbox,
+      bounded: "0",
+      limit: "30",
+    });
+
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?${params}`,
+      {
+        headers: {
+          Accept: "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Area search unavailable (HTTP ${response.status}).`
+      );
+    }
+
+    const results = await response.json();
+
+    if (!Array.isArray(results)) {
+      throw new Error("Unexpected search response.");
+    }
+
+    const withinWard = results.filter((item) => {
+      const latitude = Number(item.lat);
+      const longitude = Number(item.lon);
+
+      return (
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude) &&
+        insideBoundary(latitude, longitude, boundary)
+      );
+    });
+
+    setAreaResults(withinWard);
+
+    if (!withinWard.length) {
+      setAreaSearchError(
+        "No matching place was found inside Ndenderu Ward. " +
+        "Try a shorter name."
+      );
+    }
+  } catch (error) {
+    setAreaSearchError(
+      error.message || "Area search failed. Please try again."
+    );
+  } finally {
+    setSearchingArea(false);
+  }
+}
+
+function selectSearchedArea(item) {
+  setFocusedArea({
+    latitude: Number(item.lat),
+    longitude: Number(item.lon),
+  });
+
+  setAreaQuery(item.display_name);
+  setAreaResults([]);
+  setAreaSearchError("");
+}
+
   return (
     <section
       className="community-map-section"
@@ -444,6 +644,65 @@ export default function CommunityIssuesMap({
         </div>
       </div>
 
+   {/* FIND AREA */}
+
+      <div className="community-area-search">
+        <label htmlFor="community-area-query">
+          Find an area in Ndenderu Ward
+        </label>
+
+        <div className="community-area-search-controls">
+          <input
+            id="community-area-query"
+            type="search"
+            value={areaQuery}
+            onChange={(event) => {
+              setAreaQuery(event.target.value);
+              setAreaResults([]);
+              setAreaSearchError("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                searchArea();
+              }
+            }}
+            placeholder="Search a road, market or landmark..."
+            disabled={!boundary || searchingArea}
+          />
+
+          <button
+            type="button"
+            onClick={searchArea}
+            disabled={!boundary || searchingArea}
+          >
+            {searchingArea ? "Searching..." : "Find area"}
+          </button>
+        </div>
+
+        {areaSearchError && (
+          <p
+            className="community-area-search-error"
+            role="alert"
+          >
+            {areaSearchError}
+          </p>
+        )}
+
+        {areaResults.length > 0 && (
+          <div className="community-area-search-results">
+            {areaResults.map((item) => (
+              <button
+                key={item.place_id}
+                type="button"
+                onClick={() => selectSearchedArea(item)}
+              >
+                📍 {item.display_name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       {/* FILTERS */}
 
       <div className="community-map-controls">
@@ -639,6 +898,7 @@ export default function CommunityIssuesMap({
               ))}
 
               <MapBounds boundary={boundary} />
+              <FlyToSearchedArea area={focusedArea} />
             </MapContainer>
           </div>
 
