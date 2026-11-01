@@ -1,7 +1,18 @@
 
 .community-map-section {
   margin: 2rem 0;
+  min-width: 0;
 }
+
+.community-map-section *,
+.community-map-section *::before,
+.community-map-section *::after {
+  box-sizing: border-box;
+}
+
+/* =========================================
+   HEADER
+========================================= */
 
 .community-map-heading {
   margin-bottom: 1.5rem;
@@ -26,6 +37,10 @@
   max-width: 650px;
   line-height: 1.6;
 }
+
+/* =========================================
+   STATISTICS
+========================================= */
 
 .community-map-stats {
   display: grid;
@@ -53,6 +68,10 @@
   color: #163d2c;
 }
 
+/* =========================================
+   FILTERS
+========================================= */
+
 .community-map-controls {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
@@ -77,7 +96,6 @@
   background: #fff;
   color: #20382b;
   font: inherit;
-  box-sizing: border-box;
 }
 
 .community-map-controls input:focus,
@@ -113,6 +131,10 @@
   background: #eef8f2;
 }
 
+/* =========================================
+   MAP
+========================================= */
+
 .community-map-frame {
   height: 520px;
   overflow: hidden;
@@ -127,6 +149,10 @@
   height: 100%;
   z-index: 0;
 }
+
+/* =========================================
+   MAP MARKERS
+========================================= */
 
 .community-pin-wrapper {
   background: transparent;
@@ -152,6 +178,10 @@
   border-radius: 50%;
   background: #fff;
 }
+
+/* =========================================
+   MAP POPUPS
+========================================= */
 
 .community-map-popup {
   min-width: 190px;
@@ -196,6 +226,10 @@
   background: #116b4b;
 }
 
+/* =========================================
+   MAP FOOTER AND LEGEND
+========================================= */
+
 .community-map-footer {
   display: flex;
   flex-direction: column;
@@ -229,6 +263,10 @@
   border-radius: 50%;
 }
 
+/* =========================================
+   LOADING, ERROR AND EMPTY STATES
+========================================= */
+
 .community-map-message,
 .community-map-note {
   padding: 1.5rem;
@@ -238,7 +276,14 @@
   margin-top: 1rem;
 }
 
-/* CATEGORY BREAKDOWN */
+.community-map-note p {
+  margin: 0 0 1rem;
+  line-height: 1.6;
+}
+
+/* =========================================
+   CATEGORY BREAKDOWN
+========================================= */
 
 .community-category-breakdown {
   margin-top: 1.5rem;
@@ -346,63 +391,9 @@
   cursor: pointer;
 }
 
-/* RESPONSIVE DESIGN */
-
-@media (max-width: 900px) {
-  .community-map-controls {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .community-map-stats {
-    gap: 0.5rem;
-  }
-
-  .community-map-stat {
-    padding: 0.85rem;
-  }
-
-  .community-map-stat strong {
-    font-size: 1.5rem;
-  }
-
-  .community-map-stat span {
-    font-size: 0.75rem;
-  }
-
-  .community-map-frame {
-    height: 420px;
-  }
-
-  .community-category-list {
-    grid-template-columns: 1fr;
-  }
-
-  .community-category-breakdown {
-    padding: 1rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .community-map-stat strong {
-    font-size: 1.3rem;
-  }
-
-  .community-map-stat span {
-    font-size: 0.7rem;
-  }
-
-  .community-map-frame {
-    height: 360px;
-  }
-
-  .community-map-filter-actions {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-/* PUBLIC MAP AREA SEARCH */
+/* =========================================
+   FIND AREA SEARCH
+========================================= */
 
 .community-area-search {
   margin: 24px 0;
@@ -479,6 +470,8 @@
   text-align: left;
   font: inherit;
   cursor: pointer;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 
 .community-area-search-results button:hover {
@@ -486,21 +479,9 @@
   border-color: #16835d;
 }
 
-@media (max-width: 600px) {
-  .community-area-search {
-    padding: 16px;
-  }
-
-  .community-area-search-controls {
-    flex-direction: column;
-  }
-
-  .community-area-search-controls button {
-    width: 100%;
-  }
-}
-
-/* BACK TO NDENDERU BUTTON */
+/* =========================================
+   BACK TO NDENDERU BUTTON
+========================================= */
 
 .community-area-search-controls .community-return-ward {
   background: #ffffff;
@@ -510,4 +491,138 @@
 
 .community-area-search-controls .community-return-ward:hover:not(:disabled) {
   background: #eaf6ef;
+}
+
+/* =========================================
+   ACCESSIBILITY
+========================================= */
+
+.community-area-search-controls button:focus-visible,
+.community-area-search-results button:focus-visible,
+.community-map-reset:focus-visible,
+.community-map-popup button:focus-visible {
+  outline: 3px solid #16835d;
+  outline-offset: 3px;
+}
+
+/* =========================================
+   RESPONSIVE DESIGN - TABLETS
+========================================= */
+
+@media (max-width: 900px) {
+  .community-map-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .community-map-section {
+    margin: 1.25rem 0;
+  }
+
+  .community-map-heading h2 {
+    font-size: 1.65rem;
+  }
+
+  .community-map-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .community-map-stat {
+    padding: 0.85rem;
+  }
+
+  .community-map-stat strong {
+    font-size: 1.5rem;
+  }
+
+  .community-map-stat span {
+    font-size: 0.75rem;
+  }
+
+  .community-area-search {
+    padding: 16px;
+  }
+
+  .community-map-frame {
+    height: 420px;
+  }
+
+  .community-map-legend {
+    gap: 0.5rem 0.85rem;
+  }
+
+  .community-category-list {
+    grid-template-columns: 1fr;
+  }
+
+  .community-category-breakdown {
+    padding: 1rem;
+  }
+}
+
+/* =========================================
+   RESPONSIVE DESIGN - SMALL SCREENS
+========================================= */
+
+@media (max-width: 600px) {
+  .community-area-search-controls {
+    flex-direction: column;
+  }
+
+  .community-area-search-controls button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .community-map-stats {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .community-map-stat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+  }
+
+  .community-map-stat span {
+    margin-bottom: 0;
+    font-size: 0.85rem;
+  }
+
+  .community-map-stat strong {
+    font-size: 1.4rem;
+  }
+
+  .community-map-frame {
+    height: 380px;
+    border-radius: 12px;
+  }
+
+  .community-map-filter-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .community-map-reset {
+    width: 100%;
+  }
+
+  .community-map-popup {
+    min-width: 0;
+    max-width: 220px;
+  }
+
+  .community-category-breakdown {
+    padding: 0.85rem;
+  }
+
+  .community-category-item {
+    padding: 0.85rem;
+  }
 }
