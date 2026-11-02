@@ -139,6 +139,8 @@ function FitWard({ boundary }) {
         padding: [30, 30],
         maxZoom: 14,
       });
+      map.setMaxBounds(bounds.pad(0.15));
+      map.options.maxBoundsViscosity = 0.85;
     }
   }, [map, boundary]);
 
@@ -171,6 +173,29 @@ function FlyToArea({ selectedArea }) {
 }
 
 // ==========================================
+// RETURN TO WARD
+// ==========================================
+
+function ReturnToWard({ boundary, resetKey }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!boundary || resetKey === 0) return;
+
+    const bounds = L.geoJSON(boundary).getBounds();
+    if (bounds.isValid()) {
+      map.flyToBounds(bounds, {
+        padding: [30, 30],
+        maxZoom: 14,
+        duration: 1.1,
+      });
+    }
+  }, [map, boundary, resetKey]);
+
+  return null;
+}
+
+// ==========================================
 // ADMIN ISSUES MAP
 // ==========================================
 
@@ -186,6 +211,9 @@ export default function AdminIssuesMap({
   const [locations, setLocations] = useState([]);
   const [categories, setCategories] = useState([]);
   const [boundary, setBoundary] = useState(null);
+  const [boundaryLoading, setBoundaryLoading] = useState(true);
+  const [boundaryError, setBoundaryError] = useState("");
+  const [wardResetKey, setWardResetKey] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -267,6 +295,9 @@ export default function AdminIssuesMap({
     let cancelled = false;
 
     async function loadBoundary() {
+      setBoundaryLoading(true);
+      setBoundaryError("");
+      setBoundary(null);
       try {
         const response = await fetch(
           `${import.meta.env.BASE_URL}ndenderu-ward.geojson`
@@ -291,11 +322,13 @@ export default function AdminIssuesMap({
         }
       } catch (err) {
         if (!cancelled) {
-          setError(
+          setBoundaryError(
             err.message ||
               "Unable to load the ward boundary."
           );
         }
+      } finally {
+        if (!cancelled) setBoundaryLoading(false);
       }
     }
 
@@ -304,7 +337,7 @@ export default function AdminIssuesMap({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryKey]);
 
   // ==========================================
   // SEARCH FOR AN AREA WITHIN NDENDERU
@@ -713,6 +746,30 @@ export default function AdminIssuesMap({
           </button>
         </form>
 
+        <button
+          type="button"
+          disabled={!boundary || loading || boundaryLoading}
+          onClick={() => {
+            setSelectedArea(null);
+            setAreaSearch("");
+            setAreaResults([]);
+            setAreaError("");
+            setWardResetKey((current) => current + 1);
+          }}
+          style={{
+            marginTop: "0.75rem",
+            padding: "0.7rem 1rem",
+            border: "1px solid #16835d",
+            borderRadius: "10px",
+            background: "white",
+            color: "#176344",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Back to Ndenderu
+        </button>
+
         {areaError && (
           <p
             className="admin-area-error"
@@ -754,19 +811,19 @@ export default function AdminIssuesMap({
 
       {/* MAP */}
 
-      {loading ? (
+      {loading || boundaryLoading ? (
         <div
           className="state-box"
           role="status"
         >
-          Loading admin map...
+          Loading admin map and ward boundary...
         </div>
-      ) : error ? (
+      ) : error || boundaryError ? (
         <div
           className="state-box"
           role="alert"
         >
-          <p>{error}</p>
+          <p>{error || boundaryError}</p>
 
           <button
             type="button"
@@ -785,6 +842,8 @@ export default function AdminIssuesMap({
             <MapContainer
               center={CENTER}
               zoom={13}
+              minZoom={12}
+              maxZoom={19}
               scrollWheelZoom={false}
               className="admin-map-leaflet"
             >
@@ -896,6 +955,10 @@ export default function AdminIssuesMap({
 
               <FlyToArea
                 selectedArea={selectedArea}
+              />
+              <ReturnToWard
+                boundary={boundary}
+                resetKey={wardResetKey}
               />
             </MapContainer>
           </div>
