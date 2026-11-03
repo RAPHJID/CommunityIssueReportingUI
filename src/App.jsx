@@ -14,6 +14,7 @@ import ReportDetails from "./components/ReportDetails";
 import AdminDashboard from "./components/AdminDashboard";
 import { isAdminUser } from "./utils/authRoles";
 import CommunityIssuesMap from "./components/CommunityIssuesMap";
+import HomePage from "./components/HomePage";
 
 const STATUS = {
   0: "Submitted",
@@ -89,6 +90,7 @@ function App() {
   // DASHBOARD STATE
   // ==========================================
 
+  const [activeView, setActiveView] = useState("home");
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -384,6 +386,7 @@ async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
 
   function handleSelectReport(reportId) {
     setShowAdminDashboard(false);
+    setActiveView("reports");
     setSelectedReportId(reportId);
     setSelectedReport(null);
     setDetailsError("");
@@ -406,35 +409,51 @@ async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
     setHistoryError("");
   }
 
+  function navigate(view) {
+    setActiveView(view);
+    setShowAdminDashboard(view === "admin" && isAdmin);
+    setSelectedReportId(null);
+    setShowReportForm(view === "submit");
+    setShowLogin(view === "submit" && !currentUser);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openSubmission() {
+    navigate("submit");
+  }
+
   // ==========================================
   // USER INTERFACE
   // ==========================================
 
   return (
     <div className="app">
-      <Navbar />
+      <Navbar activeView={activeView} onNavigate={navigate} isAdmin={isAdmin} />
 
       <main>
-        {/* HERO SECTION */}
+        {activeView === "home" && (
+          <HomePage
+            reports={reports}
+            loading={loading}
+            getStatusLabel={getStatusLabel}
+            onExplore={() => navigate("reports")}
+            onReport={openSubmission}
+            onOpenReport={handleSelectReport}
+          />
+        )}
 
-        <section className="hero" id="home">
-          <div className="container">
-            <div className="eyebrow">
-              Your community. Your voice.
+        {activeView !== "home" && (
+          <div className="cc-view-banner">
+            <div className="container">
+              <span className="cc-view-kicker">NDENDERU WARD / COMMUNITY CONNECT</span>
+              <h1>{activeView === "admin" ? "Community oversight" : activeView === "submit" ? "Make your voice count" : "Community reports"}</h1>
+              <p>{activeView === "admin" ? "Review and manage submitted issues." : activeView === "submit" ? "Tell us what needs attention in your neighborhood." : "Explore what residents are reporting and follow each issue's progress."}</p>
             </div>
-
-            <h1>
-              Let's make our community better, together.
-            </h1>
-
-            <p>
-              See the issues residents have reported,
-              follow their progress, and stay informed
-              about the work needed in our community.
-            </p>
           </div>
-        </section>
+        )}
 
+        {activeView !== "home" && (
+          <>
         {/* LOGIN SECTION */}
 
         <section
@@ -488,18 +507,7 @@ async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
           )}
         </section>
 
-        {isAdmin && (
-          <section className="container" aria-label="Administration access">
-            <button type="button" className="secondary-button" onClick={() => {
-              setShowAdminDashboard(current => !current);
-              setSelectedReportId(null);
-            }}>
-              {showAdminDashboard ? "Return to community reports" : "Open admin dashboard"}
-            </button>
-          </section>
-        )}
-
-        {isAdmin && showAdminDashboard && (
+        {isAdmin && activeView === "admin" && (
           <div className="container">
             <AdminDashboard
   reports={reports}
@@ -516,7 +524,7 @@ async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
 
         {/* REPORT SUBMISSION SECTION */}
 
-        {currentUser && (
+        {activeView === "submit" && currentUser && (
           <section className="container report-launch-area">
             {!showReportForm ? (
               <button
@@ -561,7 +569,7 @@ async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
 
         {/* INTERACTIVE COMMUNITY ISSUES MAP */}
 
-{!selectedReportId && (
+{activeView === "reports" && !selectedReportId && (
   <section
     className="container"
     id="community-map"
@@ -577,11 +585,11 @@ async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
 
         {/* COMMUNITY STATISTICS */}
 
-        <ReportStatistics statistics={statistics} />
+        {activeView === "reports" && <ReportStatistics statistics={statistics} />}
 
         {/* REPORTS SECTION */}
 
-        <section
+        {activeView === "reports" && <section
           className="container reports-section"
           id="reports"
         >
@@ -692,7 +700,9 @@ async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
               )}
             </>
           )}
-        </section>
+        </section>}
+          </>
+        )}
       </main>
 
       {/* FOOTER */}
