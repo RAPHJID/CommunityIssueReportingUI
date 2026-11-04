@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { apiRequest, uploadReportPhoto } from "../services/api";
 import PhotoUploader from "./PhotoUploader";
 import LocationPicker from "./LocationPicker";
+import "./SubmissionV2.css";
 
 function getOptionId(item) {
   return item?.id ?? item?.categoryId ?? item?.locationId ?? "";
@@ -72,6 +73,14 @@ export default function ReportForm({
   const selectedCategoryIsOther = isOtherCategory(
     getOptionName(selectedCategory)
   );
+
+  // A live readiness guide, not a multi-step wizard: photos stay optional.
+  const issueReady = title.trim().length >= 5 && description.trim().length >= 10;
+  const categoryReady = Boolean(categoryId);
+  const locationReady = Boolean(mapPoint) && Boolean(wardId);
+  const requiredReadyCount = [issueReady, categoryReady, locationReady].filter(Boolean).length;
+  const readyToSubmit = requiredReadyCount === 3;
+
 
   function showModal(type, titleText, message) {
     setSubmissionModal({
@@ -512,6 +521,11 @@ export default function ReportForm({
           <span className="report-form-orbit-dot dot-three" />
         </div>
 
+        <div className="submission-v2-side-note">
+          <span aria-hidden="true">✦</span>
+          <div><strong>Made for Ndenderu</strong><small>Every issue starts with a real place in our ward.</small></div>
+        </div>
+
         <div className="report-form-visual-footer">
           <span />
           A better community begins with being heard.
@@ -551,6 +565,26 @@ export default function ReportForm({
           </p>
         </div>
 
+        {/* LIVE FORM READINESS — the sections remain on one page. */}
+        <div className="submission-v2-readiness" aria-label="Report preparation progress">
+          <div className="submission-v2-readiness-top">
+            <div>
+              <span className="submission-v2-eyebrow">YOUR REPORT CHECKLIST</span>
+              <strong>{savedReportId ? "Report saved — finish photo uploads" : readyToSubmit ? "Your report is ready" : "A few details make a difference"}</strong>
+            </div>
+            <span className="submission-v2-readiness-count">{requiredReadyCount} / 3 ready</span>
+          </div>
+          <div className="submission-v2-progress" role="progressbar" aria-valuenow={requiredReadyCount} aria-valuemin={0} aria-valuemax={3} aria-label="Required sections completed">
+            <span style={{ width: `${(requiredReadyCount / 3) * 100}%` }} />
+          </div>
+          <div className="submission-v2-checks">
+            <span className={issueReady ? "is-done" : ""}><b>{issueReady ? "✓" : "1"}</b> Describe issue</span>
+            <span className={categoryReady ? "is-done" : ""}><b>{categoryReady ? "✓" : "2"}</b> Choose category</span>
+            <span className={locationReady ? "is-done" : ""}><b>{locationReady ? "✓" : "3"}</b> Pin location</span>
+          </div>
+          <p>Photos are helpful but optional. You can submit once all three essentials are ready.</p>
+        </div>
+
         {/* LOADING ERROR */}
 
         {optionsError && (
@@ -573,6 +607,12 @@ export default function ReportForm({
           className="report-form-fields"
           onSubmit={handleSubmit}
         >
+          <div className="submission-v2-section-heading">
+            <span className="submission-v2-section-number">01</span>
+            <div><h3>Tell us what happened</h3><p>Short, specific details help others understand the concern.</p></div>
+            {issueReady && <span className="submission-v2-complete">✓ Ready</span>}
+          </div>
+
           {/* TITLE */}
 
           <div className="report-form-field">
@@ -641,6 +681,12 @@ export default function ReportForm({
               Include enough detail to help others
               understand the issue.
             </p>
+          </div>
+
+          <div className="submission-v2-section-heading">
+            <span className="submission-v2-section-number">02</span>
+            <div><h3>Choose a category</h3><p>Help residents discover and follow similar reports.</p></div>
+            {categoryReady && <span className="submission-v2-complete">✓ Ready</span>}
           </div>
 
           {/* CATEGORY CARDS */}
@@ -783,6 +829,12 @@ export default function ReportForm({
             </p>
           </div>
 
+          <div className="submission-v2-section-heading">
+            <span className="submission-v2-section-number">03</span>
+            <div><h3>Show us where</h3><p>Search, use GPS, or tap the precise point on the map.</p></div>
+            {locationReady && <span className="submission-v2-complete">✓ Ready</span>}
+          </div>
+
           {/* LOCATION PICKER */}
 
           <div className="report-form-field">
@@ -847,6 +899,12 @@ export default function ReportForm({
             />
           </div>
 
+          <div className="submission-v2-section-heading">
+            <span className="submission-v2-section-number">04</span>
+            <div><h3>Add photo evidence <em>Optional</em></h3><p>A photo can make your report easier to understand.</p></div>
+            {photos.length > 0 && <span className="submission-v2-complete">✓ {photos.length} attached</span>}
+          </div>
+
           {/* PHOTO UPLOAD */}
 
           <PhotoUploader
@@ -866,6 +924,14 @@ export default function ReportForm({
               <p>{submitError}</p>
             </div>
           )}
+
+          <div className="submission-v2-final-check">
+            <div className="submission-v2-final-check-icon" aria-hidden="true">✓</div>
+            <div>
+              <strong>{savedReportId ? "Your report has already been saved" : readyToSubmit ? "You're ready to make it visible" : "Almost there — check the essentials above"}</strong>
+              <p>{savedReportId ? "Only the remaining photo uploads will be retried; we won't create a second report." : "Your submission is recorded on your account. The community can follow its progress."}</p>
+            </div>
+          </div>
 
           {/* SUBMIT BUTTON */}
 

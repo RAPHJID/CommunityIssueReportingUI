@@ -437,7 +437,12 @@ export default function LocationPicker({
     );
 
   return (
-    <div className="civic-location-picker">
+    <div className="civic-location-picker submission-v2-location-picker">
+      <div className="submission-v2-map-help">
+        <span className="submission-v2-map-help-icon" aria-hidden="true">⌖</span>
+        <div><strong>Pin the exact problem spot</strong><p>The green outline shows the reporting area. A pin outside it won't be accepted.</p></div>
+        <span className="submission-v2-map-ward">Ndenderu Ward</span>
+      </div>
       <div className="civic-location-toolbar">
         <span>
           Select an issue location inside Ndenderu Ward
@@ -580,6 +585,11 @@ export default function LocationPicker({
           </>
         )}
       </MapContainer>
+
+      <div className={`submission-v2-pin-state ${validPoint ? "is-valid" : ""}`} role="status">
+        <span aria-hidden="true">{validPoint ? "✓" : "◎"}</span>
+        <div><strong>{validPoint ? "Location confirmed" : "Waiting for a location pin"}</strong><small>{validPoint ? "The selected location is within Ndenderu Ward." : "Tap the map inside the green boundary to place your pin."}</small></div>
+      </div>
 
       {/* LOCATION FEEDBACK */}
 

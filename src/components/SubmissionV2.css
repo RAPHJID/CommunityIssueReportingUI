@@ -1,0 +1,73 @@
+/* Community Connect · Report Submission 2.0
+   Additive stylesheet: scoped so the existing App.css and map/gallery CSS stay intact. */
+.report-form-panel { isolation: isolate; }
+.report-form-panel .report-form-content { position: relative; }
+.report-form-panel .report-form-intro { margin-bottom: 22px; }
+.report-form-panel .submission-v2-readiness {
+  border: 1px solid #d9e8df; border-radius: 22px; padding: 22px 24px;
+  margin: 0 0 30px; background: linear-gradient(135deg,#f5fbf7 0%,#fff 83%);
+  box-shadow: 0 12px 35px rgba(23,68,44,.055); color: #153d2b;
+}
+.report-form-panel .submission-v2-readiness-top { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.report-form-panel .submission-v2-readiness-top > div { display:grid; gap:5px; }
+.report-form-panel .submission-v2-eyebrow { color:#497760; font-size:10px; font-weight:800; letter-spacing:.15em; }
+.report-form-panel .submission-v2-readiness-top strong {font-size:clamp(16px,2vw,20px);letter-spacing:-.025em;}
+.report-form-panel .submission-v2-readiness-count {flex-shrink:0; font-size:12px;font-weight:800;color:#28724b;background:#e6f5ea;border:1px solid #cce6d3;padding:8px 10px;border-radius:999px;}
+.report-form-panel .submission-v2-progress {height:8px;margin:19px 0 17px;border-radius:100px;background:#e0ece3;overflow:hidden;}
+.report-form-panel .submission-v2-progress > span {display:block;height:100%;background:linear-gradient(90deg,#2e8b57,#88c987);border-radius:inherit;transition:width .35s ease;}
+.report-form-panel .submission-v2-checks {display:flex;flex-wrap:wrap;gap:10px;}
+.report-form-panel .submission-v2-checks > span {display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid #e1e7e3;border-radius:999px;background:white;font-size:12px;font-weight:700;color:#66746b;}
+.report-form-panel .submission-v2-checks > span.is-done {background:#e8f5ec;color:#20683e;border-color:#c9e6d1;}
+.report-form-panel .submission-v2-checks b {height:20px;width:20px;display:grid;place-items:center;border-radius:50%;background:#e9eeea;font-size:11px;}
+.report-form-panel .submission-v2-checks .is-done b {background:#237846;color:#fff;}
+.report-form-panel .submission-v2-readiness > p {margin:15px 0 0!important;font-size:12px;line-height:1.6;color:#6a7d6d;}
+.report-form-panel .submission-v2-section-heading {display:flex;align-items:center;gap:14px;margin:29px 0 18px;padding:0 0 16px;border-bottom:1px solid #e9eee9;}
+.report-form-panel .submission-v2-section-number {width:42px;height:42px;flex-shrink:0;display:grid;place-items:center;border:1px solid #d9eadd;background:#f0f8f1;color:#2b7d4d;border-radius:13px;font-size:13px;font-weight:900;}
+.report-form-panel .submission-v2-section-heading > div {flex:1;min-width:0;}
+.report-form-panel .submission-v2-section-heading h3 {margin:0!important;color:#163e2c;font-size:18px;font-weight:800;letter-spacing:-.025em;}
+.report-form-panel .submission-v2-section-heading p {margin:5px 0 0!important;font-size:12px;line-height:1.5;color:#7b887f;}
+.report-form-panel .submission-v2-section-heading em {font-size:10px;letter-spacing:0;font-style:normal;font-weight:700;color:#6d826f;background:#eef2ef;border-radius:99px;padding:3px 7px;vertical-align:middle;margin-left:5px;}
+.report-form-panel .submission-v2-complete {flex-shrink:0;font-size:11px;color:#20824b;font-weight:800;background:#e9f7ed;border:1px solid #d2ebd8;padding:7px 10px;border-radius:99px;}
+.report-form-panel .submission-v2-final-check {margin:27px 0 17px;background:#f5faf6;border:1px solid #dcebe0;border-radius:18px;padding:17px;display:flex;gap:12px;align-items:flex-start;}
+.report-form-panel .submission-v2-final-check-icon {height:30px;width:30px;flex-shrink:0;background:#e1f2e6;color:#217044;border-radius:10px;display:grid;place-items:center;font-weight:900;}
+.report-form-panel .submission-v2-final-check strong {font-size:13px;color:#1d4630;}
+.report-form-panel .submission-v2-final-check p {margin:5px 0 0!important;color:#698174;font-size:12px;line-height:1.55;}
+.report-form-panel .submission-v2-side-note {display:flex;align-items:flex-start;gap:11px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:17px;padding:15px;margin-top:20px;color:#fff;}
+.report-form-panel .submission-v2-side-note > span {font-size:22px;}
+.report-form-panel .submission-v2-side-note div {display:grid;gap:4px;}
+.report-form-panel .submission-v2-side-note strong {font-size:13px;}
+.report-form-panel .submission-v2-side-note small {font-size:11px;line-height:1.55;opacity:.85;}
+.report-form-panel .submission-v2-map-help {padding:14px 16px;display:flex;align-items:center;gap:12px;background:#eff8f1;border:1px solid #d7e8da;border-radius:16px;margin:12px 0;}
+.report-form-panel .submission-v2-map-help-icon {flex-shrink:0;width:36px;height:36px;border-radius:11px;display:grid;place-items:center;color:#2f7950;background:white;font-size:22px;}
+.report-form-panel .submission-v2-map-help > div {flex:1;min-width:0;}
+.report-form-panel .submission-v2-map-help strong {font-size:13px;color:#1d5133;}
+.report-form-panel .submission-v2-map-help p {margin:4px 0 0!important;font-size:11px;line-height:1.5;color:#5c7764;}
+.report-form-panel .submission-v2-map-ward {font-size:10px;font-weight:800;color:#286643;white-space:nowrap;padding:7px 9px;border-radius:9px;background:white;}
+.report-form-panel .submission-v2-pin-state {display:flex;align-items:center;gap:10px;margin:12px 0;border:1px solid #e5e8e5;border-radius:14px;padding:12px 14px;background:#f8faf8;color:#6c7970;}
+.report-form-panel .submission-v2-pin-state.is-valid {border-color:#c9e6d1;background:#eff9f1;color:#28724a;}
+.report-form-panel .submission-v2-pin-state > span {width:28px;height:28px;display:grid;place-items:center;background:#e5ebe6;border-radius:50%;font-weight:800;}
+.report-form-panel .submission-v2-pin-state.is-valid > span {background:#2b8b54;color:white;}
+.report-form-panel .submission-v2-pin-state > div {display:grid;gap:3px;}
+.report-form-panel .submission-v2-pin-state strong {font-size:12px;}
+.report-form-panel .submission-v2-pin-state small {font-size:11px;line-height:1.5;}
+.report-form-panel .photo-uploader {border-radius:20px;}
+.report-form-panel .photo-uploader-dropzone {transition:border-color .2s,background .2s,transform .2s;}
+.report-form-panel .photo-uploader-dropzone.is-dragging {transform:scale(1.005);}
+.report-form-panel .report-form-submit {transition:transform .2s ease,box-shadow .2s ease,filter .2s ease;}
+.report-form-panel .report-form-submit:hover:not(:disabled) {transform:translateY(-2px);filter:brightness(1.04);}
+@media (max-width:720px) {
+ .report-form-panel .submission-v2-readiness {padding:17px 15px;border-radius:17px;}
+ .report-form-panel .submission-v2-checks {gap:6px;}
+ .report-form-panel .submission-v2-checks > span {font-size:10px;padding:6px;}
+ .report-form-panel .submission-v2-checks b {width:17px;height:17px;}
+ .report-form-panel .submission-v2-section-heading {gap:10px;}
+ .report-form-panel .submission-v2-section-heading h3 {font-size:16px;}
+ .report-form-panel .submission-v2-section-number {width:34px;height:34px;border-radius:10px;}
+ .report-form-panel .submission-v2-complete {font-size:10px;padding:5px 7px;}
+ .report-form-panel .submission-v2-map-ward {display:none;}
+}
+@media (prefers-reduced-motion:reduce) {
+ .report-form-panel .submission-v2-progress > span,
+ .report-form-panel .report-form-submit,
+ .report-form-panel .photo-uploader-dropzone {transition:none!important;}
+}
