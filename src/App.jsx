@@ -619,6 +619,7 @@ async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
               onRetryHistory={() =>
                 loadReportHistory(selectedReportId)
               }
+              currentUser={currentUser}
             />
           ) : (
             <>

@@ -1,4 +1,5 @@
 import "./CommunityReports.css";
+import ReportSupport from "./ReportSupport";
 
 const STATUS_META = {
   Submitted: { icon: "◷", tone: "blue", detail: "Waiting for review" },
@@ -41,6 +42,7 @@ function ReportList({ reports, totalReports, getStatusLabel, formatDate, onSelec
               <div className="cc-card-meta">
                 <span className="cc-card-meta-item"><span aria-hidden="true">◷</span> Reported {formatDate(report.createdAt)}</span>
                 {report.isDuplicate && <span className="cc-card-duplicate">Duplicate report</span>}
+                <ReportSupport reportId={report.id} compact />
               </div>
               <div className="cc-card-bottom">
                 <span className="cc-card-progress"><span className={`cc-card-progress-dot cc-card-progress-dot--${meta.tone}`} />{meta.detail}</span>

@@ -2,11 +2,12 @@ import ReportLocationMap from "./ReportLocationMap";
 import ReportTimeline from "./ReportTimeline";
 import ReportGallery from "./ReportGallery";
 import "./ReportDetailsV2.css";
+import ReportSupport from "./ReportSupport";
 
 const STAGES = ["Submitted", "Under Review", "Acknowledged", "In Progress", "Resolved"];
 const ICONS = { Category: "◈", Location: "⌖", Reported: "◷", Status: "◎" };
 
-function ReportDetails({ report, loading, error, onBack, onRetry, getStatusLabel, formatDate, categoryName, locationName, history, historyLoading, historyError, onRetryHistory }) {
+function ReportDetails({ report, loading, error, onBack, onRetry, getStatusLabel, formatDate, categoryName, locationName, history, historyLoading, historyError, onRetryHistory, currentUser }) {
   const status = report ? getStatusLabel(report.currentStatus) : "Unknown";
   const statusClass = status.toLowerCase().replace(/\s+/g, "-");
   const isClosedException = ["Rejected", "Duplicate", "Out of Jurisdiction"].includes(status);
@@ -56,6 +57,8 @@ function ReportDetails({ report, loading, error, onBack, onRetry, getStatusLabel
 
           <section className="rd2-description" aria-labelledby="rd2-description-title"><p className="rd2-kicker">THE RESIDENT'S CONCERN</p><h3 id="rd2-description-title">About this issue</h3><p>{report.description || "No description was provided for this report."}</p></section>
 
+          <ReportSupport reportId={report.id} userId={currentUser?.id ?? currentUser?.userId} />
+
           <div className="rd2-content"><ReportLocationMap locationId={report.locationId} locationName={locationName}/><ReportGallery reportId={report.id}/><ReportTimeline report={report} history={history} loading={historyLoading} error={historyError} onRetry={onRetryHistory} getStatusLabel={getStatusLabel}/></div>
           {report.isDuplicate && <div className="rd2-duplicate" role="note">ⓘ This report has been marked as a duplicate.</div>}
           <footer className="rd2-footer"><strong>COMMUNITY CONNECT</strong><span>Making community concerns visible · Ndenderu Ward</span></footer>
@@ -65,3 +68,4 @@ function ReportDetails({ report, loading, error, onBack, onRetry, getStatusLabel
   );
 }
 export default ReportDetails;
+s
