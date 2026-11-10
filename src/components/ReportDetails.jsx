@@ -68,4 +68,3 @@ function ReportDetails({ report, loading, error, onBack, onRetry, getStatusLabel
   );
 }
 export default ReportDetails;
-s
