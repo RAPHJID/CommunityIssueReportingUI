@@ -1,9 +1,16 @@
-
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 
 import { apiRequest } from "./services/api";
 import "./App.css";
-
 import Navbar from "./components/Navbar";
 import ReportStatistics from "./components/ReportStatistics";
 import ReportFilters from "./components/ReportFilters";
@@ -12,9 +19,9 @@ import LoginForm from "./components/LoginForm";
 import ReportForm from "./components/ReportForm";
 import ReportDetails from "./components/ReportDetails";
 import AdminDashboard from "./components/AdminDashboard";
-import { isAdminUser } from "./utils/authRoles";
 import CommunityIssuesMap from "./components/CommunityIssuesMap";
 import HomePage from "./components/HomePage";
+import { isAdminUser } from "./utils/authRoles";
 
 const STATUS = {
   0: "Submitted",
@@ -24,698 +31,388 @@ const STATUS = {
   4: "Resolved",
   5: "Rejected",
   6: "Duplicate",
+  7: "Out Of Jurisdiction",
 };
 
 const FILTERS = [
-  "All Reports",
-  "Submitted",
-  "Under Review",
-  "Acknowledged",
-  "In Progress",
-  "Resolved",
-  "Rejected",
-  "Duplicate",
+  "All Reports", "Submitted", "Under Review", "Acknowledged",
+  "In Progress", "Resolved", "Rejected", "Duplicate", "Out Of Jurisdiction",
 ];
 
 function getStatusLabel(status) {
   if (typeof status === "number" || /^\d+$/.test(String(status))) {
     return STATUS[status] ?? "Unknown";
   }
-
   const normalized = String(status ?? "")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/_/g, " ");
-
-  return normalized
-    ? normalized.charAt(0).toUpperCase() + normalized.slice(1)
-    : "Unknown";
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Unknown";
 }
 
-function formatDate(dateString) {
-  if (!dateString) return "Date unavailable";
-
-  const date = new Date(dateString);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Date unavailable";
-  }
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+function formatDate(value) {
+  if (!value) return "Date unavailable";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "Date unavailable"
+    : new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(date);
 }
 
 function getSavedUser() {
   try {
-    const savedUser = localStorage.getItem("user");
-    return savedUser ? JSON.parse(savedUser) : null;
+    const stored = localStorage.getItem("user");
+    return stored ? JSON.parse(stored) : null;
   } catch {
     return null;
   }
 }
 
 function getLocationName(location) {
+  return location?.description ?? location?.name ?? location?.locationName ?? "Unnamed location";
+}
+
+function ViewBanner({ title, description }) {
   return (
-    location?.description ??
-    location?.name ??
-    location?.locationName ??
-    "Unnamed location"
+    <div className="cc-view-banner">
+      <div className="container">
+        <span className="cc-view-kicker">NDENDERU WARD / COMMUNITY CONNECT</span>
+        <h1>{title}</h1>
+        <p>{description}</p>
+      </div>
+    </div>
   );
 }
 
-function App() {
-  // ==========================================
-  // DASHBOARD STATE
-  // ==========================================
+function AccountStatus({ currentUser, onLogout, onLogin }) {
+  return (
+    <section className="container login-area" aria-label="Account">
+      {currentUser ? (
+        <div className="login-status">
+          <div>
+            <p>Signed in as <strong>{currentUser.fullName}</strong></p>
+            <p className="muted">{currentUser.email}</p>
+          </div>
+          <button type="button" className="secondary-button" onClick={onLogout}>Sign out</button>
+        </div>
+      ) : (
+        <div className="login-prompt">
+          <p className="muted">Want to report a community issue?</p>
+          <button type="button" className="primary-button" onClick={onLogin}>
+            Sign in to submit a report
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
 
-  const [activeView, setActiveView] = useState("home");
+function ReportDetailsRoute({ categories, locations, currentUser }) {
+  const { reportId } = useParams();
+  const navigate = useNavigate();
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
+  const [retryReport, setRetryReport] = useState(0);
+  const [retryHistory, setRetryHistory] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReport(null);
+    setError("");
+    setLoading(true);
+    apiRequest(`/Report/${encodeURIComponent(reportId)}`)
+      .then((data) => {
+        if (!cancelled) {
+          if (!data || String(data.id).toLowerCase() !== String(reportId).toLowerCase()) {
+            throw new Error("The API returned an unexpected report response.");
+          }
+          setReport(data);
+        }
+      })
+      .catch((err) => { if (!cancelled) setError(err.message || "Unable to load report details."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [reportId, retryReport]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setHistory([]);
+    setHistoryError("");
+    setHistoryLoading(true);
+    apiRequest(`/ReportStatusHistory/report/${encodeURIComponent(reportId)}`)
+      .then((data) => {
+        if (!cancelled) {
+          if (!Array.isArray(data)) throw new Error("Unexpected status history response.");
+          setHistory(data);
+        }
+      })
+      .catch((err) => { if (!cancelled) setHistoryError(err.message || "Unable to load status history."); })
+      .finally(() => { if (!cancelled) setHistoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [reportId, retryHistory]);
+
+  const category = categories.find((item) => String(item.id) === String(report?.categoryId));
+  const location = locations.find((item) => String(item.id) === String(report?.locationId));
+
+  return (
+    <>
+      <ViewBanner title="Community report" description="Follow this issue and see the recorded progress." />
+      <section className="container reports-section" id="reports">
+        <ReportDetails
+          report={report}
+          loading={loading}
+          error={error}
+          onBack={() => navigate("/explore-issues")}
+          onRetry={() => setRetryReport((value) => value + 1)}
+          getStatusLabel={getStatusLabel}
+          formatDate={formatDate}
+          categoryName={category?.name ?? "Category unavailable"}
+          locationName={location ? getLocationName(location) : "Location unavailable"}
+          history={history}
+          historyLoading={historyLoading}
+          historyError={historyError}
+          onRetryHistory={() => setRetryHistory((value) => value + 1)}
+          currentUser={currentUser}
+        />
+      </section>
+    </>
+  );
+}
+
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [currentUser, setCurrentUser] = useState(getSavedUser);
+  const isAdmin = isAdminUser(currentUser);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("All Reports");
-
-  // ==========================================
-  // AUTHENTICATION AND REPORT FORM STATE
-  // ==========================================
-
-  const [currentUser, setCurrentUser] = useState(getSavedUser);
-  const [showLogin, setShowLogin] = useState(false);
-  const [showReportForm, setShowReportForm] = useState(false);
-  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
-  const isAdmin = isAdminUser(currentUser);
-
-  // ==========================================
-  // INDIVIDUAL REPORT DETAILS STATE
-  // ==========================================
-
-  const [selectedReportId, setSelectedReportId] = useState(null);
-  const [selectedReport, setSelectedReport] = useState(null);
-  const [detailsLoading, setDetailsLoading] = useState(false);
-  const [detailsError, setDetailsError] = useState("");
-
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
-
-  // ==========================================
-  // REPORT STATUS HISTORY STATE
-  // ==========================================
-
-  const [reportHistory, setReportHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState("");
-
-  // ==========================================
-  // LOAD ALL COMMUNITY REPORTS
-  // ==========================================
 
   const loadReports = useCallback(async () => {
     setLoading(true);
     setError("");
-
     try {
       const data = await apiRequest("/Report");
-
-      if (!Array.isArray(data)) {
-        throw new Error(
-          "The API returned an unexpected reports response."
-        );
-      }
-
+      if (!Array.isArray(data)) throw new Error("The API returned an unexpected reports response.");
       setReports(data);
     } catch (err) {
-      setError(
-        err.message || "Unable to load community reports."
-      );
+      setError(err.message || "Unable to load community reports.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadReports();
-  }, [loadReports]);
-
-  // ==========================================
-  // LOAD CATEGORY AND LOCATION NAMES
-  // ==========================================
+  useEffect(() => { loadReports(); }, [loadReports]);
 
   useEffect(() => {
     let cancelled = false;
-
-    async function loadReferenceData() {
-      try {
-        const [categoryData, locationData] = await Promise.all([
-          apiRequest("/Category"),
-          apiRequest("/Location"),
-        ]);
-
+    Promise.all([apiRequest("/Category"), apiRequest("/Location")])
+      .then(([categoryData, locationData]) => {
         if (cancelled) return;
-
-        if (Array.isArray(categoryData)) {
-          setCategories(categoryData);
-        }
-
-        if (Array.isArray(locationData)) {
-          setLocations(locationData);
-        }
-      } catch (err) {
-        console.error(
-          "Unable to load report reference data:",
-          err
-        );
-      }
-    }
-
-    loadReferenceData();
-
-    return () => {
-      cancelled = true;
-    };
+        if (Array.isArray(categoryData)) setCategories(categoryData);
+        if (Array.isArray(locationData)) setLocations(locationData);
+      })
+      .catch((err) => console.error("Unable to load report reference data:", err));
+    return () => { cancelled = true; };
   }, []);
-
-  // ==========================================
-  // LOAD INDIVIDUAL REPORT DETAILS
-  // ==========================================
-
-  const loadReportDetails = useCallback(async (reportId) => {
-    setDetailsLoading(true);
-    setDetailsError("");
-    setSelectedReport(null);
-
-    try {
-      const data = await apiRequest(`/Report/${reportId}`);
-
-      if (!data || data.id !== reportId) {
-        throw new Error(
-          "The API returned an unexpected report response."
-        );
-      }
-
-      setSelectedReport(data);
-    } catch (err) {
-      setDetailsError(
-        err.message || "Unable to load report details."
-      );
-    } finally {
-      setDetailsLoading(false);
-    }
-  }, []);
-
-  // ==========================================
-  // LOAD REPORT STATUS HISTORY
-  // ==========================================
-
-  const loadReportHistory = useCallback(async (reportId) => {
-    setHistoryLoading(true);
-    setHistoryError("");
-    setReportHistory([]);
-
-    try {
-      const data = await apiRequest(
-        `/ReportStatusHistory/report/${reportId}`
-      );
-
-      if (!Array.isArray(data)) {
-        throw new Error(
-          "The API returned an unexpected status history response."
-        );
-      }
-
-      setReportHistory(data);
-    } catch (err) {
-      setHistoryError(
-        err.message || "Unable to load report status history."
-      );
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, []);
-
-  // ==========================================
-  // FETCH DETAILS AND HISTORY WHEN SELECTED
-  // ==========================================
 
   useEffect(() => {
-    if (selectedReportId) {
-      loadReportDetails(selectedReportId);
-      loadReportHistory(selectedReportId);
-    }
-  }, [
-    selectedReportId,
-    loadReportDetails,
-    loadReportHistory,
-  ]);
-
-  // ==========================================
-  // DASHBOARD STATISTICS
-  // ==========================================
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [location.pathname]);
 
   const statistics = useMemo(() => {
-    const resolved = reports.filter(
-      (report) =>
-        getStatusLabel(report.currentStatus) === "Resolved"
+    const resolved = reports.filter((r) => getStatusLabel(r.currentStatus) === "Resolved").length;
+    const unresolved = reports.filter((r) =>
+      !["Resolved", "Rejected", "Duplicate", "Out Of Jurisdiction"].includes(getStatusLabel(r.currentStatus))
     ).length;
-
-    const unresolved = reports.filter(
-      (report) =>
-        !["Resolved", "Rejected", "Duplicate"].includes(
-          getStatusLabel(report.currentStatus)
-        )
-    ).length;
-
-    return {
-      total: reports.length,
-      unresolved,
-      resolved,
-    };
+    return { total: reports.length, resolved, unresolved };
   }, [reports]);
-
-  // ==========================================
-  // SEARCH AND FILTER REPORTS
-  // ==========================================
 
   const filteredReports = useMemo(() => {
     const query = search.trim().toLowerCase();
-
-    return reports.filter((report) => {
-      const status = getStatusLabel(report.currentStatus);
-
-      const matchesFilter =
-        activeFilter === "All Reports" ||
-        status === activeFilter;
-
-      const searchableText =
-        `${report.title ?? ""} ${report.description ?? ""}`
-          .toLowerCase();
-
-      const matchesSearch =
-        !query || searchableText.includes(query);
-
-      return matchesFilter && matchesSearch;
+    return reports.filter((r) => {
+      const matchesStatus = activeFilter === "All Reports" || getStatusLabel(r.currentStatus) === activeFilter;
+      const text = `${r.title ?? ""} ${r.description ?? ""}`.toLowerCase();
+      return matchesStatus && (!query || text.includes(query));
     });
   }, [reports, search, activeFilter]);
 
-  // ==========================================
-  // SELECTED REPORT REFERENCE DATA
-  // ==========================================
-
-  const selectedCategory = categories.find(
-    (category) =>
-      category.id === selectedReport?.categoryId
-  );
-
-  const selectedLocation = locations.find(
-    (location) =>
-      location.id === selectedReport?.locationId
-  );
-
-  // ==========================================
-  // AUTHENTICATION HANDLERS
-  // ==========================================
-
   function handleLogin(user) {
     setCurrentUser(user);
-    setShowLogin(false);
+    const requested = location.state?.from;
+    const destination = typeof requested === "string" && requested.startsWith("/") && !requested.startsWith("//")
+      ? requested : "/explore-issues";
+    navigate(destination, { replace: true });
   }
 
   function handleLogout() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-
     setCurrentUser(null);
-    setShowLogin(false);
-    setShowReportForm(false);
-    setShowAdminDashboard(false);
+    if (location.pathname.startsWith("/admin") || location.pathname === "/report-issue") {
+      navigate("/", { replace: true });
+    }
   }
 
-  // ==========================================
-// ADMIN: UPDATE REPORT STATUS
-// ==========================================
-
-async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
-  if (!isAdmin) {
-    throw new Error("Only administrators can update report statuses.");
-  }
-
-  await apiRequest(`/Report/${reportId}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      newStatus: Number(newStatus),
-      reason: reason.trim(),
-      notes: notes.trim() || null,
-    }),
-  });
-
-  // Refresh the community reports and admin statistics.
-  await loadReports();
-
-  // Refresh details and timeline if this report is currently open.
-  if (selectedReportId === reportId) {
-    await Promise.all([
-      loadReportDetails(reportId),
-      loadReportHistory(reportId),
-    ]);
-  }
-}
-  // ==========================================
-  // REPORT NAVIGATION HANDLERS
-  // ==========================================
-
-  function handleSelectReport(reportId) {
-    setShowAdminDashboard(false);
-    setActiveView("reports");
-    setSelectedReportId(reportId);
-    setSelectedReport(null);
-    setDetailsError("");
-
-    setReportHistory([]);
-    setHistoryError("");
-
-    document.getElementById("reports")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
+  async function handleUpdateReportStatus(reportId, newStatus, reason, notes) {
+    if (!isAdmin) throw new Error("Only administrators can update report statuses.");
+    await apiRequest(`/Report/${encodeURIComponent(reportId)}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        newStatus: Number(newStatus),
+        reason: reason.trim(),
+        notes: notes.trim() || null,
+      }),
     });
+    await loadReports();
   }
 
-  function handleBackToReports() {
-    setSelectedReportId(null);
-    setSelectedReport(null);
-    setDetailsError("");
-
-    setReportHistory([]);
-    setHistoryError("");
-  }
-
-  function navigate(view) {
-    setActiveView(view);
-    setShowAdminDashboard(view === "admin" && isAdmin);
-    setSelectedReportId(null);
-    setShowReportForm(view === "submit");
-    setShowLogin(view === "submit" && !currentUser);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function openSubmission() {
-    navigate("submit");
-  }
-
-  // ==========================================
-  // USER INTERFACE
-  // ==========================================
+  const openReport = (reportId) => navigate(`/reports/${encodeURIComponent(reportId)}`);
+  const account = (
+    <AccountStatus
+      currentUser={currentUser}
+      onLogout={handleLogout}
+      onLogin={() => navigate("/login", { state: { from: "/report-issue" } })}
+    />
+  );
 
   return (
     <div className="app">
-      <Navbar activeView={activeView} onNavigate={navigate} isAdmin={isAdmin} />
-
+      <Navbar isAdmin={isAdmin} currentUser={currentUser} />
       <main>
-        {activeView === "home" && (
-          <HomePage
-            reports={reports}
-            loading={loading}
-            getStatusLabel={getStatusLabel}
-            onExplore={() => navigate("reports")}
-            onReport={openSubmission}
-            onOpenReport={handleSelectReport}
-          />
-        )}
-
-        {activeView !== "home" && (
-          <div className="cc-view-banner">
-            <div className="container">
-              <span className="cc-view-kicker">NDENDERU WARD / COMMUNITY CONNECT</span>
-              <h1>{activeView === "admin" ? "Community oversight" : activeView === "submit" ? "Make your voice count" : "Community reports"}</h1>
-              <p>{activeView === "admin" ? "Review and manage submitted issues." : activeView === "submit" ? "Tell us what needs attention in your neighborhood." : "Explore what residents are reporting and follow each issue's progress."}</p>
-            </div>
-          </div>
-        )}
-
-        {activeView !== "home" && (
-          <>
-        {/* LOGIN SECTION */}
-
-        <section
-          className="container login-area"
-          aria-label="Account"
-        >
-          {currentUser ? (
-            <div className="login-status">
-              <div>
-                <p>
-                  Signed in as{" "}
-                  <strong>{currentUser.fullName}</strong>
-                </p>
-
-                <p className="muted">
-                  {currentUser.email}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={handleLogout}
-              >
-                Sign out
-              </button>
-            </div>
-          ) : (
-            !showLogin && (
-              <div className="login-prompt">
-                <p className="muted">
-                  Want to report a community issue?
-                </p>
-
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={() => setShowLogin(true)}
-                >
-                  Sign in to submit a report
-                </button>
-              </div>
-            )
-          )}
-
-          {showLogin && (
-            <LoginForm
-              onLogin={handleLogin}
-              onCancel={() => setShowLogin(false)}
-            />
-          )}
-        </section>
-
-        {isAdmin && activeView === "admin" && (
-          <div className="container">
-            <AdminDashboard
-  reports={reports}
-  loading={loading}
-  error={error}
-  onRetry={loadReports}
-  onOpenReport={handleSelectReport}
-  onUpdateStatus={handleUpdateReportStatus}
-  getStatusLabel={getStatusLabel}
-  formatDate={formatDate}
-/>
-          </div>
-        )}
-
-        {/* REPORT SUBMISSION SECTION */}
-
-        {activeView === "submit" && currentUser && (
-          <section className="container report-launch-area">
-            {!showReportForm ? (
-              <button
-                type="button"
-                className="report-launch-button"
-                onClick={() => setShowReportForm(true)}
-              >
-                <span className="report-launch-copy">
-                  <span className="report-launch-eyebrow">
-                    YOUR COMMUNITY NEEDS YOU
-                  </span>
-
-                  <span className="report-launch-title">
-                    Something needs attention?
-                  </span>
-
-                  <span className="report-launch-description">
-                    Submit a report and help bring
-                    local issues into focus.
-                  </span>
-                </span>
-
-                <span
-                  className="report-launch-arrow"
-                  aria-hidden="true"
-                >
-                  →
-                </span>
-              </button>
-            ) : (
-              <ReportForm
-  onCancel={() => setShowReportForm(false)}
-  onReportCreated={loadReports}
-  onViewReport={(reportId) => {
-    setShowReportForm(false);
-    handleSelectReport(reportId);
-  }}
-/>
-            )}
-          </section>
-        )}
-
-        {/* INTERACTIVE COMMUNITY ISSUES MAP */}
-
-{activeView === "reports" && !selectedReportId && (
-  <section
-    className="container"
-    id="community-map"
-  >
-    <CommunityIssuesMap
-      reports={reports}
-      getStatusLabel={getStatusLabel}
-      formatDate={formatDate}
-      onOpenReport={handleSelectReport}
-    />
-  </section>
-)}
-
-        {/* COMMUNITY STATISTICS */}
-
-        {activeView === "reports" && <ReportStatistics statistics={statistics} />}
-
-        {/* REPORTS SECTION */}
-
-        {activeView === "reports" && <section
-          className="container reports-section"
-          id="reports"
-        >
-          {selectedReportId ? (
-            <ReportDetails
-              report={selectedReport}
-              loading={detailsLoading}
-              error={detailsError}
-              onBack={handleBackToReports}
-              onRetry={() =>
-                loadReportDetails(selectedReportId)
-              }
+        <Routes>
+          <Route path="/" element={
+            <HomePage
+              reports={reports}
+              loading={loading}
               getStatusLabel={getStatusLabel}
-              formatDate={formatDate}
-              categoryName={
-                selectedCategory?.name ??
-                "Category unavailable"
-              }
-              locationName={
-                selectedLocation
-                  ? getLocationName(selectedLocation)
-                  : "Location unavailable"
-              }
-              history={reportHistory}
-              historyLoading={historyLoading}
-              historyError={historyError}
-              onRetryHistory={() =>
-                loadReportHistory(selectedReportId)
-              }
-              currentUser={currentUser}
+              onExplore={() => navigate("/explore-issues")}
+              onReport={() => navigate("/report-issue")}
+              onOpenReport={openReport}
             />
-          ) : (
+          } />
+
+          <Route path="/explore-issues" element={
             <>
-              {/* SEARCH AND FILTERS */}
-
-              <ReportFilters
-                search={search}
-                onSearchChange={setSearch}
-                activeFilter={activeFilter}
-                onFilterChange={setActiveFilter}
-                filters={FILTERS}
-              />
-
-              {/* LOADING STATE */}
-
-              {loading ? (
-                <div
-                  className="state-box"
-                  role="status"
-                >
-                  <h3>
-                    Loading community reports...
-                  </h3>
-
-                  <p className="muted">
-                    Please wait while we fetch
-                    the latest data.
-                  </p>
-                </div>
-              ) : error ? (
-                /* ERROR STATE */
-
-                <div
-                  className="state-box"
-                  role="alert"
-                >
-                  <h3>
-                    We couldn't load the reports
-                  </h3>
-
-                  <p className="muted">
-                    {error}
-                  </p>
-
-                  <button
-                    className="retry-button"
-                    type="button"
-                    onClick={loadReports}
-                  >
-                    Try again
-                  </button>
-                </div>
-              ) : filteredReports.length === 0 ? (
-                /* EMPTY STATE */
-
-                <div className="state-box">
-                  <h3>
-                    {reports.length === 0
-                      ? "No reports have been submitted yet"
-                      : "No matching reports found"}
-                  </h3>
-
-                  <p className="muted">
-                    {reports.length === 0
-                      ? "Reports submitted by residents will appear here."
-                      : "Try another search term or choose a different status filter."}
-                  </p>
-                </div>
-              ) : (
-                /* REPORT LIST */
-
-                <ReportList
-                  reports={filteredReports}
-                  totalReports={reports.length}
+              <ViewBanner title="Community reports" description="Explore what residents are reporting and follow each issue's progress." />
+              {account}
+              <section className="container" id="community-map">
+                <CommunityIssuesMap
+                  reports={reports}
                   getStatusLabel={getStatusLabel}
                   formatDate={formatDate}
-                  onSelectReport={handleSelectReport}
+                  onOpenReport={openReport}
                 />
-              )}
+              </section>
+              <ReportStatistics statistics={statistics} />
+              <section className="container reports-section" id="reports">
+                <ReportFilters
+                  search={search}
+                  onSearchChange={setSearch}
+                  activeFilter={activeFilter}
+                  onFilterChange={setActiveFilter}
+                  filters={FILTERS}
+                />
+                {loading ? (
+                  <div className="state-box" role="status"><h3>Loading community reports...</h3><p className="muted">Please wait while we fetch the latest data.</p></div>
+                ) : error ? (
+                  <div className="state-box" role="alert"><h3>We couldn't load the reports</h3><p className="muted">{error}</p><button className="retry-button" type="button" onClick={loadReports}>Try again</button></div>
+                ) : filteredReports.length === 0 ? (
+                  <div className="state-box"><h3>{reports.length === 0 ? "No reports have been submitted yet" : "No matching reports found"}</h3><p className="muted">{reports.length === 0 ? "Reports submitted by residents will appear here." : "Try another search term or choose a different status filter."}</p></div>
+                ) : (
+                  <ReportList
+                    reports={filteredReports}
+                    totalReports={reports.length}
+                    getStatusLabel={getStatusLabel}
+                    formatDate={formatDate}
+                    onSelectReport={openReport}
+                  />
+                )}
+              </section>
             </>
-          )}
-        </section>}
-          </>
-        )}
+          } />
+
+          <Route path="/reports/:reportId" element={
+            <ReportDetailsRoute categories={categories} locations={locations} currentUser={currentUser} />
+          } />
+
+          <Route path="/login" element={currentUser ? <Navigate to="/explore-issues" replace /> : (
+            <>
+              <ViewBanner title="Welcome back" description="Sign in to participate in Ndenderu community reporting." />
+              <section className="container login-area" aria-label="Sign in">
+                <LoginForm onLogin={handleLogin} onCancel={() => navigate("/")} />
+              </section>
+            </>
+          )} />
+
+          <Route path="/report-issue" element={!currentUser ? (
+            <Navigate to="/login" state={{ from: "/report-issue" }} replace />
+          ) : (
+            <>
+              <ViewBanner title="Make your voice count" description="Tell us what needs attention in your neighborhood." />
+              {account}
+              <section className="container report-launch-area">
+                <ReportForm
+                  onCancel={() => navigate("/explore-issues")}
+                  onReportCreated={loadReports}
+                  onViewReport={openReport}
+                />
+              </section>
+            </>
+          )} />
+
+          <Route path="/admin/dashboard" element={!currentUser ? (
+            <Navigate to="/login" state={{ from: "/admin/dashboard" }} replace />
+          ) : !isAdmin ? (
+            <>
+              <ViewBanner title="Access restricted" description="Only administrators can view this dashboard." />
+              <section className="container state-box" role="alert">
+                <h3>Administrator access required</h3>
+                <p className="muted">Your account does not have permission to open this page.</p>
+                <button type="button" className="primary-button" onClick={() => navigate("/explore-issues")}>Explore community issues</button>
+              </section>
+            </>
+          ) : (
+            <>
+              <ViewBanner title="Community oversight" description="Review and manage submitted issues." />
+              {account}
+              <div className="container">
+                <AdminDashboard
+                  reports={reports}
+                  loading={loading}
+                  error={error}
+                  onRetry={loadReports}
+                  onOpenReport={openReport}
+                  onUpdateStatus={handleUpdateReportStatus}
+                  getStatusLabel={getStatusLabel}
+                  formatDate={formatDate}
+                />
+              </div>
+            </>
+          )} />
+
+          <Route path="*" element={
+            <>
+              <ViewBanner title="Page not found" description="We couldn't find the page you requested." />
+              <div className="container state-box">
+                <h3>404 — This page doesn't exist</h3>
+                <button className="primary-button" type="button" onClick={() => navigate("/")}>Return home</button>
+              </div>
+            </>
+          } />
+        </Routes>
       </main>
-
-      {/* FOOTER */}
-
-      <footer className="footer">
-        <div className="container">
-          Community Connect · Building a more
-          accountable community.
-        </div>
-      </footer>
+      <footer className="footer"><div className="container">Community Connect · Building a more accountable community.</div></footer>
     </div>
   );
 }
 
-export default App;
+export default function App() {
+  return <BrowserRouter><AppContent /></BrowserRouter>;
+}
