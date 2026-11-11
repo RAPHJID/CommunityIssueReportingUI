@@ -4,6 +4,7 @@ import "./AdminDashboard.css";
 import "./AdminDashboardV2.css";
 import ResolutionEvidenceUpload from "./ResolutionEvidenceUpload";
 import AdminIssuesMap from "./AdminIssuesMap";
+import CommunityInsights from "./CommunityInsights";
 
 const FILTERS = [
   "All Reports",
@@ -273,6 +274,8 @@ export default function AdminDashboard({
           <span className="cc-admin-workflow-note">Other statuses are excluded from this bar.</span>
         </div>
       </div>
+
+      <CommunityInsights reports={reports} loading={loading} error={error} onOpenReport={onOpenReport} />
 
       <div className="cc-admin-map-heading">
         <div><p className="cc-admin-kicker">GEOGRAPHIC OVERVIEW</p><h3>Issues across the ward</h3><p>Explore reports on the map and open management controls from their markers.</p></div>
