@@ -16,6 +16,7 @@ import ReportStatistics from "./components/ReportStatistics";
 import ReportFilters from "./components/ReportFilters";
 import ReportList from "./components/ReportList";
 import LoginForm from "./components/LoginForm";
+import JoinCommunity from "./components/JoinCommunity";
 import ReportForm from "./components/ReportForm";
 import ReportDetails from "./components/ReportDetails";
 import AdminDashboard from "./components/AdminDashboard";
@@ -347,9 +348,15 @@ function AppContent() {
               <ViewBanner title="Welcome back" description="Sign in to participate in Ndenderu community reporting." />
               <section className="container login-area" aria-label="Sign in">
                 <LoginForm onLogin={handleLogin} onCancel={() => navigate("/")} />
+                <p style={{ textAlign: "center", marginTop: 20, color: "#4d6c5c" }}>
+                  New to Community Connect?{" "}
+                  <a href="/join" onClick={(event) => { event.preventDefault(); navigate("/join", { state: { from: location.state?.from || "/report-issue" } }); }} style={{ color: "#246e4c", fontWeight: 800 }}>Join the community →</a>
+                </p>
               </section>
             </>
           )} />
+
+          <Route path="/join" element={currentUser ? <Navigate to="/explore-issues" replace /> : <JoinCommunity />} />
 
           <Route path="/report-issue" element={!currentUser ? (
             <Navigate to="/login" state={{ from: "/report-issue" }} replace />
